@@ -5,6 +5,7 @@ Production-ready Magento 2 authenticity verification module for `pynarae.com`.
 ## Features
 
 - Frontend verification page at `/verify`
+- Mobile camera QR scan on `/verify` when browser supports `getUserMedia` + `BarcodeDetector` (desktop shows mobile-scan guidance)
 - QR-friendly verification URLs, for example:
   - `https://pynarae.com/verify?code=PYN-ABCD1234EFGH`
 - Verification code master table
@@ -93,6 +94,21 @@ Generated CSV columns:
 ```csv
 code,product_sku,batch_no,status,notes,meta_json,verify_url
 ```
+
+`verify_url` can be directly converted to QR codes by your label/printing workflow for batch anti-counterfeit deployment.
+
+
+## Scan history API (Admin)
+
+For customer service / risk-control use, admins can query per-code scan history:
+
+```text
+GET /admin/pynarae_verify/log/history?code=PYN-ABCD1234EFGH&limit=50
+```
+
+Response fields include each scan's timestamp (`scanned_at`), `ip`, `user_agent`, `matched`, and `verify_status`.
+
+> Requires admin authentication and `Pynarae_Verify::logs` permission.
 
 ## Admin pages
 
