@@ -38,11 +38,16 @@ $submittedCode = $block->getSubmittedCode();
                     <span><?= $block->escapeHtml(__('Scan QR code with camera')) ?></span>
                 </button>
                 <p class="pynarae-verify__scanner-message" data-role="scan-message"></p>
-                <div class="pynarae-verify__camera" data-role="scan-camera" hidden>
+                <div class="pynarae-verify__scanner-modal" data-role="scan-modal" hidden>
                     <video class="pynarae-verify__video" data-role="scan-video" playsinline muted></video>
-                    <button class="action secondary pynarae-verify__stop-button" type="button" data-role="scan-stop">
-                        <span><?= $block->escapeHtml(__('Stop camera')) ?></span>
-                    </button>
+                    <div class="pynarae-verify__scan-mask" aria-hidden="true">
+                        <div class="pynarae-verify__scan-frame"></div>
+                    </div>
+                    <div class="pynarae-verify__scanner-toolbar">
+                        <button class="action secondary pynarae-verify__stop-button" type="button" data-role="scan-stop">
+                            <span><?= $block->escapeHtml(__('Stop camera')) ?></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -117,11 +122,12 @@ $submittedCode = $block->getSubmittedCode();
                 "noCameraApi": "<?= $block->escapeJsQuote(__('This browser cannot access the camera. Please enter the anti-counterfeit code manually.'), '"') ?>",
                 "noBarcodeDetector": "<?= $block->escapeJsQuote(__('This browser does not support native QR recognition. Please upgrade your browser or enter the anti-counterfeit code manually.'), '"') ?>",
                 "cameraDenied": "<?= $block->escapeJsQuote(__('Camera permission was denied or unavailable. Please enter the anti-counterfeit code manually.'), '"') ?>",
-                "scanning": "<?= $block->escapeJsQuote(__('Align the QR code within the camera frame.'), '"') ?>",
+                "scanning": "<?= $block->escapeJsQuote(__('Align the QR code within the camera frame. The scanner will close automatically after a successful scan.'), '"') ?>",
                 "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start camera preview. Please enter the anti-counterfeit code manually.'), '"') ?>",
-                "successSubmitting": "<?= $block->escapeJsQuote(__('QR code recognized successfully. Submitting verification...'), '"') ?>",
+                "successDetected": "<?= $block->escapeJsQuote(__('QR code detected successfully. Preparing verification...'), '"') ?>",
+                "successSubmitting": "<?= $block->escapeJsQuote(__('Submitting verification...'), '"') ?>",
                 "keepFocus": "<?= $block->escapeJsQuote(__('Scanning... keep the camera steady and in focus.'), '"') ?>",
-                "cameraStopped": "<?= $block->escapeJsQuote(__('Camera stopped.'), '"') ?>"
+                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Verification failed, please try again.'), '"') ?>"
             }
         }
     }

@@ -9,19 +9,20 @@ define([], function () {
 
         var scanTrigger = scannerRoot.querySelector('[data-role="scan-trigger"]');
         var scanMessage = scannerRoot.querySelector('[data-role="scan-message"]');
-        var scanCamera = scannerRoot.querySelector('[data-role="scan-camera"]');
+        var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
         var scanStop = scannerRoot.querySelector('[data-role="scan-stop"]');
         var codeInput = document.querySelector('#verify-code');
         var form = document.querySelector('.pynarae-verify__form');
 
-        if (!scanTrigger || !scanMessage || !scanCamera || !scanVideo || !scanStop || !codeInput || !form) {
+        if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop || !codeInput || !form) {
             return;
         }
 
         var stream;
         var scanTimer;
-
+        var successDelayTimer;
+        var isFinishingScan = false;
         var messages = config.messages || {};
 
         var setMessage = function (message, isError) {
@@ -29,11 +30,18 @@ define([], function () {
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
         };
 
-        var stopScanner = function () {
+        var closeScanner = function () {
             if (scanTimer) {
                 window.clearInterval(scanTimer);
                 scanTimer = null;
             }
+
+            if (successDelayTimer) {
+                window.clearTimeout(successDelayTimer);
+                successDelayTimer = null;
+            }
+
+            isFinishingScan = false;
 
             if (stream) {
                 stream.getTracks().forEach(function (track) {
@@ -43,7 +51,50 @@ define([], function () {
             }
 
             scanVideo.srcObject = null;
-            scanCamera.hidden = true;
+            scanModal.hidden = true;
+            document.body.classList.remove('pynarae-verify--scanner-open');
+        };
+
+        var parseScannedCode = function (rawValue) {
+            var scannedText = rawValue.trim();
+
+            try {
+                scannedText = decodeURIComponent(scannedText);
+            } catch (e) {
+                // Keep original value when decoding fails.
+            }
+
+            if (!/^https?:\/\//i.test(scannedText)) {
+                return scannedText;
+            }
+
+            try {
+                var url = new URL(scannedText);
+                var codeFromQuery = url.searchParams.get('code');
+                if (codeFromQuery) {
+                    return codeFromQuery;
+                }
+
+                var pathParts = url.pathname.split('/').filter(Boolean);
+                if (pathParts.length > 1 && pathParts[0].toLowerCase() === 'verify') {
+                    return pathParts[pathParts.length - 1];
+                }
+            } catch (e) {
+                return scannedText;
+            }
+
+            return scannedText;
+        };
+
+        var submitScannedCode = function (qrValue) {
+            var codeValue = parseScannedCode(qrValue);
+            if (!codeValue) {
+                return;
+            }
+
+            codeInput.value = codeValue;
+            setMessage(messages.successSubmitting, false);
+            form.submit();
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
@@ -69,16 +120,8 @@ define([], function () {
 
         var detector = new window.BarcodeDetector({formats: ['qr_code']});
 
-        var safeDecode = function (value) {
-            try {
-                return decodeURIComponent(value);
-            } catch (e) {
-                return value;
-            }
-        };
-
         scanTrigger.addEventListener('click', async function () {
-            stopScanner();
+            closeScanner();
 
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
@@ -92,20 +135,22 @@ define([], function () {
                 return;
             }
 
+            isFinishingScan = false;
             scanVideo.srcObject = stream;
-            scanCamera.hidden = false;
+            scanModal.hidden = false;
+            document.body.classList.add('pynarae-verify--scanner-open');
             setMessage(messages.scanning, false);
 
             try {
                 await scanVideo.play();
             } catch (e) {
-                stopScanner();
+                closeScanner();
                 setMessage(messages.previewFailed, true);
                 return;
             }
 
             scanTimer = window.setInterval(async function () {
-                if (!stream) {
+                if (!stream || isFinishingScan) {
                     return;
                 }
 
@@ -120,34 +165,28 @@ define([], function () {
                         return;
                     }
 
-                    stopScanner();
-
-                    var scannedText = safeDecode(qrValue);
-                    var codeValue = scannedText;
-
-                    if (/^https?:\/\//i.test(scannedText)) {
-                        try {
-                            var url = new URL(scannedText);
-                            codeValue = url.searchParams.get('code') || scannedText;
-                        } catch (e) {
-                            codeValue = scannedText;
-                        }
+                    isFinishingScan = true;
+                    if (scanTimer) {
+                        window.clearInterval(scanTimer);
+                        scanTimer = null;
                     }
 
-                    codeInput.value = codeValue;
-                    setMessage(messages.successSubmitting, false);
-                    form.submit();
+                    setMessage(messages.successDetected, false);
+                    successDelayTimer = window.setTimeout(function () {
+                        closeScanner();
+                        submitScannedCode(qrValue);
+                    }, 650);
                 } catch (e) {
                     setMessage(messages.keepFocus, false);
                 }
-            }, 600);
+            }, 500);
         });
 
         scanStop.addEventListener('click', function () {
-            stopScanner();
-            setMessage(messages.cameraStopped, false);
+            closeScanner();
+            setMessage(messages.scanFailedRetry, true);
         });
 
-        window.addEventListener('beforeunload', stopScanner);
+        window.addEventListener('beforeunload', closeScanner);
     };
 });
