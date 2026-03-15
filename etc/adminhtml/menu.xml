@@ -5,6 +5,7 @@
          title="Pynarae"
          module="Pynarae_Verify"
          sortOrder="950"
+         parent="Magento_Backend::content"
          resource="Pynarae_Verify::root"/>
     <add id="Pynarae_Verify::codes_menu"
          title="Verify Codes"
