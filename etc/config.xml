@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <pynarae_verify>
+            <general>
+                <enabled>1</enabled>
+                <page_title>Product Authenticity Check</page_title>
+                <intro_text>Enter the verification code from your package to confirm authenticity.</intro_text>
+                <first_scan_message>This code is valid and this appears to be the first successful verification.</first_scan_message>
+                <repeat_scan_message>This code is valid, but it has already been verified before.</repeat_scan_message>
+                <invalid_message>We could not find this verification code. Please contact our support team.</invalid_message>
+                <suspicious_threshold>3</suspicious_threshold>
+                <show_product_sku>1</show_product_sku>
+                <show_batch_no>1</show_batch_no>
+                <show_scan_count>1</show_scan_count>
+            </general>
+        </pynarae_verify>
+    </default>
+</config>

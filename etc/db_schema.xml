@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <table name="pynarae_verify_code" resource="default" engine="innodb" comment="Pynarae Verify Codes">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="varchar" name="code" nullable="false" length="64" comment="Verification Code"/>
+        <column xsi:type="smallint" name="status" nullable="false" default="1" comment="Status"/>
+        <column xsi:type="varchar" name="product_sku" nullable="true" length="64" comment="Product SKU"/>
+        <column xsi:type="varchar" name="batch_no" nullable="true" length="64" comment="Batch Number"/>
+        <column xsi:type="text" name="notes" nullable="true" comment="Notes"/>
+        <column xsi:type="text" name="meta_json" nullable="true" comment="Meta JSON"/>
+        <column xsi:type="timestamp" name="first_scanned_at" nullable="true" comment="First Scanned At"/>
+        <column xsi:type="timestamp" name="last_scanned_at" nullable="true" comment="Last Scanned At"/>
+        <column xsi:type="int" name="scan_count" unsigned="true" nullable="false" default="0" comment="Scan Count"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <constraint xsi:type="unique" referenceId="PYNARAE_VERIFY_CODE_UNQ_CODE">
+            <column name="code"/>
+        </constraint>
+
+        <index referenceId="PYNARAE_VERIFY_CODE_IDX_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_CODE_IDX_PRODUCT_SKU" indexType="btree">
+            <column name="product_sku"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_CODE_IDX_BATCH_NO" indexType="btree">
+            <column name="batch_no"/>
+        </index>
+    </table>
+
+    <table name="pynarae_verify_scan_log" resource="default" engine="innodb" comment="Pynarae Verify Scan Log">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="code_id" unsigned="true" nullable="true" comment="Code Entity ID"/>
+        <column xsi:type="varchar" name="code" nullable="false" length="64" comment="Verification Code"/>
+        <column xsi:type="smallint" name="matched" nullable="false" default="0" comment="Matched"/>
+        <column xsi:type="varchar" name="verify_status" nullable="false" length="32" comment="Verify Status"/>
+        <column xsi:type="varchar" name="ip" nullable="true" length="64" comment="IP Address"/>
+        <column xsi:type="text" name="user_agent" nullable="true" comment="User Agent"/>
+        <column xsi:type="text" name="referer" nullable="true" comment="Referer"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <index referenceId="PYNARAE_VERIFY_SCAN_LOG_IDX_CODE_ID" indexType="btree">
+            <column name="code_id"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_SCAN_LOG_IDX_CODE" indexType="btree">
+            <column name="code"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_SCAN_LOG_IDX_MATCHED" indexType="btree">
+            <column name="matched"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_SCAN_LOG_IDX_VERIFY_STATUS" indexType="btree">
+            <column name="verify_status"/>
+        </index>
+
+        <index referenceId="PYNARAE_VERIFY_SCAN_LOG_IDX_CREATED_AT" indexType="btree">
+            <column name="created_at"/>
+        </index>
+    </table>
+</schema>

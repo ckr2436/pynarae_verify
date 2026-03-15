@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="pynarae_verify_import_csv" xsi:type="object">Pynarae\Verify\Console\Command\ImportCsvCommand</item>
+                <item name="pynarae_verify_generate_csv" xsi:type="object">Pynarae\Verify\Console\Command\GenerateCsvCommand</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="pynarae_verify_code_listing_data_source" xsi:type="string">PynaraeVerifyCodeGridCollection</item>
+                <item name="pynarae_verify_log_listing_data_source" xsi:type="string">PynaraeVerifyLogGridCollection</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PynaraeVerifyCodeGridCollection" type="Pynarae\Verify\Ui\DataProvider\Code\Listing\Collection">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">pynarae_verify_code</argument>
+            <argument name="resourceModel" xsi:type="string">Pynarae\Verify\Model\ResourceModel\Code</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PynaraeVerifyLogGridCollection" type="Pynarae\Verify\Ui\DataProvider\ScanLog\Listing\Collection">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">pynarae_verify_scan_log</argument>
+            <argument name="resourceModel" xsi:type="string">Pynarae\Verify\Model\ResourceModel\ScanLog</argument>
+        </arguments>
+    </virtualType>
+</config>

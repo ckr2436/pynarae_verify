@@ -1,0 +1,94 @@
+<?php
+/** @var \Pynarae\Verify\Block\Verify $block */
+$result = $block->getVerificationResult();
+$submittedCode = $block->getSubmittedCode();
+?>
+<div class="pynarae-verify">
+    <div class="pynarae-verify__card">
+        <h1 class="pynarae-verify__title"><?= $block->escapeHtml($block->getPageTitle()) ?></h1>
+
+        <?php if ($block->getIntroText()): ?>
+            <p class="pynarae-verify__intro"><?= $block->escapeHtml($block->getIntroText()) ?></p>
+        <?php endif; ?>
+
+        <?php if (!$block->isEnabled()): ?>
+            <div class="pynarae-verify__result pynarae-verify__result--notice">
+                <?= $block->escapeHtml(__('Verification is currently unavailable. Please try again later.')) ?>
+            </div>
+        <?php else: ?>
+            <form class="pynarae-verify__form" method="get" action="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+                <label class="pynarae-verify__label" for="verify-code">
+                    <?= $block->escapeHtml(__('Verification code')) ?>
+                </label>
+                <input class="pynarae-verify__input"
+                       type="text"
+                       id="verify-code"
+                       name="code"
+                       value="<?= $block->escapeHtmlAttr($submittedCode) ?>"
+                       placeholder="<?= $block->escapeHtmlAttr(__('Enter your code')) ?>"
+                       autocomplete="off"
+                       spellcheck="false" />
+                <button class="action primary pynarae-verify__button" type="submit">
+                    <span><?= $block->escapeHtml(__('Verify')) ?></span>
+                </button>
+            </form>
+
+            <?php if ($result): ?>
+                <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>">
+                    <div class="pynarae-verify__result-title"><?= $block->escapeHtml($result['title'] ?? '') ?></div>
+                    <div class="pynarae-verify__result-text"><?= $block->escapeHtml($result['message'] ?? '') ?></div>
+                </div>
+
+                <div class="pynarae-verify__details">
+                    <table class="data table">
+                        <tbody>
+                        <tr>
+                            <th><?= $block->escapeHtml(__('Verification Code')) ?></th>
+                            <td><?= $block->escapeHtml($result['code'] ?? '') ?></td>
+                        </tr>
+                        <tr>
+                            <th><?= $block->escapeHtml(__('Validity')) ?></th>
+                            <td><?= !empty($result['matched']) ? $block->escapeHtml(__('Valid')) : $block->escapeHtml(__('Invalid')) ?></td>
+                        </tr>
+
+                        <?php if ($block->shouldShowProductSku() && !empty($result['product_sku'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('Product SKU')) ?></th>
+                                <td><?= $block->escapeHtml($result['product_sku']) ?></td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <?php if ($block->shouldShowBatchNo() && !empty($result['batch_no'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('Batch Number')) ?></th>
+                                <td><?= $block->escapeHtml($result['batch_no']) ?></td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <?php if ($block->shouldShowScanCount() && isset($result['scan_count'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('Verification Count')) ?></th>
+                                <td><?= (int)$result['scan_count'] ?></td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <?php if (!empty($result['first_scanned_at'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('First Successful Verification')) ?></th>
+                                <td><?= $block->escapeHtml($result['first_scanned_at']) ?></td>
+                            </tr>
+                        <?php endif; ?>
+
+                        <?php if (!empty($result['last_scanned_at'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('Last Successful Verification')) ?></th>
+                                <td><?= $block->escapeHtml($result['last_scanned_at']) ?></td>
+                            </tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+</div>
