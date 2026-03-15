@@ -15,6 +15,13 @@
              parent="Pynarae_Verify::root"
              action="pynarae_verify/code/index"
              resource="Pynarae_Verify::codes"/>
+        <add id="Pynarae_Verify::generate_menu"
+             title="Batch Generate"
+             module="Pynarae_Verify"
+             sortOrder="15"
+             parent="Pynarae_Verify::root"
+             action="pynarae_verify/generate/index"
+             resource="Pynarae_Verify::generate"/>
         <add id="Pynarae_Verify::logs_menu"
              title="Scan Logs"
              module="Pynarae_Verify"
