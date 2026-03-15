@@ -1,16 +1,18 @@
 <?xml version="1.0"?>
-<acl xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
-    <resources>
-        <resource id="Magento_Backend::admin">
-            <resource id="Pynarae_Verify::root" title="Pynarae Verify" sortOrder="950">
-                <resource id="Pynarae_Verify::codes" title="Verify Codes" sortOrder="10">
-                    <resource id="Pynarae_Verify::save" title="Save Codes" sortOrder="10"/>
-                    <resource id="Pynarae_Verify::delete" title="Delete Codes" sortOrder="20"/>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Pynarae_Verify::root" title="Pynarae Verify" sortOrder="950">
+                    <resource id="Pynarae_Verify::codes" title="Verify Codes" sortOrder="10">
+                        <resource id="Pynarae_Verify::save" title="Save Codes" sortOrder="10"/>
+                        <resource id="Pynarae_Verify::delete" title="Delete Codes" sortOrder="20"/>
+                    </resource>
+                    <resource id="Pynarae_Verify::logs" title="Scan Logs" sortOrder="20"/>
+                    <resource id="Pynarae_Verify::config" title="Settings" sortOrder="30"/>
                 </resource>
-                <resource id="Pynarae_Verify::logs" title="Scan Logs" sortOrder="20"/>
-                <resource id="Pynarae_Verify::config" title="Settings" sortOrder="30"/>
             </resource>
-        </resource>
-    </resources>
-</acl>
+        </resources>
+    </acl>
+</config>
