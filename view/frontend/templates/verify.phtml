@@ -33,6 +33,19 @@ $submittedCode = $block->getSubmittedCode();
                 </button>
             </form>
 
+            <div class="pynarae-verify__scanner" data-role="qr-scanner">
+                <button class="action secondary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
+                    <span><?= $block->escapeHtml(__('Scan QR code with camera')) ?></span>
+                </button>
+                <p class="pynarae-verify__scanner-message" data-role="scan-message"></p>
+                <div class="pynarae-verify__camera" data-role="scan-camera" hidden>
+                    <video class="pynarae-verify__video" data-role="scan-video" playsinline muted></video>
+                    <button class="action secondary pynarae-verify__stop-button" type="button" data-role="scan-stop">
+                        <span><?= $block->escapeHtml(__('Stop camera')) ?></span>
+                    </button>
+                </div>
+            </div>
+
             <?php if ($result): ?>
                 <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>">
                     <div class="pynarae-verify__result-title"><?= $block->escapeHtml($result['title'] ?? '') ?></div>
@@ -92,3 +105,25 @@ $submittedCode = $block->getSubmittedCode();
         <?php endif; ?>
     </div>
 </div>
+
+
+<script type="text/x-magento-init">
+{
+    "[data-role=\"qr-scanner\"]": {
+        "Pynarae_Verify/js/verify-scanner": {
+            "rootSelector": "[data-role=\"qr-scanner\"]",
+            "messages": {
+                "desktopGuide": "<?= $block->escapeJsQuote(__('Please use your phone to scan: scan the product QR code with your phone camera, then open the verification page.'), '"') ?>",
+                "noCameraApi": "<?= $block->escapeJsQuote(__('This browser cannot access the camera. Please enter the anti-counterfeit code manually.'), '"') ?>",
+                "noBarcodeDetector": "<?= $block->escapeJsQuote(__('This browser does not support native QR recognition. Please upgrade your browser or enter the anti-counterfeit code manually.'), '"') ?>",
+                "cameraDenied": "<?= $block->escapeJsQuote(__('Camera permission was denied or unavailable. Please enter the anti-counterfeit code manually.'), '"') ?>",
+                "scanning": "<?= $block->escapeJsQuote(__('Align the QR code within the camera frame.'), '"') ?>",
+                "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start camera preview. Please enter the anti-counterfeit code manually.'), '"') ?>",
+                "successSubmitting": "<?= $block->escapeJsQuote(__('QR code recognized successfully. Submitting verification...'), '"') ?>",
+                "keepFocus": "<?= $block->escapeJsQuote(__('Scanning... keep the camera steady and in focus.'), '"') ?>",
+                "cameraStopped": "<?= $block->escapeJsQuote(__('Camera stopped.'), '"') ?>"
+            }
+        }
+    }
+}
+</script>
