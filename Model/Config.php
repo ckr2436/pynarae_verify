@@ -19,6 +19,12 @@ class Config
     private const XML_PATH_SHOW_PRODUCT_SKU = 'pynarae_verify/general/show_product_sku';
     private const XML_PATH_SHOW_BATCH_NO = 'pynarae_verify/general/show_batch_no';
     private const XML_PATH_SHOW_SCAN_COUNT = 'pynarae_verify/general/show_scan_count';
+    private const XML_PATH_QR_VERIFY_BASE_URL = 'pynarae_verify/general/qr_verify_base_url';
+    private const XML_PATH_QR_CODE_PARAM = 'pynarae_verify/general/qr_code_param';
+    private const XML_PATH_QR_IMAGE_URL_TEMPLATE = 'pynarae_verify/general/qr_image_url_template';
+    private const XML_PATH_SECURE_TOKEN_ENABLED = 'pynarae_verify/general/secure_token_enabled';
+    private const XML_PATH_SECURE_TOKEN_KEY = 'pynarae_verify/general/secure_token_key';
+    private const XML_PATH_SECURE_TOKEN_TTL_DAYS = 'pynarae_verify/general/secure_token_ttl_days';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig
@@ -75,5 +81,37 @@ class Config
     public function shouldShowScanCount(?int $storeId = null): bool
     {
         return $this->scopeConfig->isSetFlag(self::XML_PATH_SHOW_SCAN_COUNT, ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    public function getQrVerifyBaseUrl(?int $storeId = null): string
+    {
+        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_QR_VERIFY_BASE_URL, ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
+    public function getQrCodeParam(?int $storeId = null): string
+    {
+        $value = trim((string)$this->scopeConfig->getValue(self::XML_PATH_QR_CODE_PARAM, ScopeInterface::SCOPE_STORE, $storeId));
+        return $value !== '' ? $value : 'code';
+    }
+
+    public function getQrImageUrlTemplate(?int $storeId = null): string
+    {
+        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_QR_IMAGE_URL_TEMPLATE, ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
+
+    public function isSecureTokenEnabled(?int $storeId = null): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_SECURE_TOKEN_ENABLED, ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    public function getSecureTokenKey(?int $storeId = null): string
+    {
+        return trim((string)$this->scopeConfig->getValue(self::XML_PATH_SECURE_TOKEN_KEY, ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
+    public function getSecureTokenTtlDays(?int $storeId = null): int
+    {
+        return max(0, (int)$this->scopeConfig->getValue(self::XML_PATH_SECURE_TOKEN_TTL_DAYS, ScopeInterface::SCOPE_STORE, $storeId));
     }
 }

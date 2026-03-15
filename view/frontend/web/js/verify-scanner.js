@@ -8,6 +8,7 @@ define([], function () {
         }
 
         var scanTrigger = scannerRoot.querySelector('[data-role="scan-trigger"]');
+        var codeParamName = (scannerRoot.getAttribute('data-code-param') || 'code').trim() || 'code';
         var scanMessage = scannerRoot.querySelector('[data-role="scan-message"]');
         var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
@@ -70,7 +71,7 @@ define([], function () {
 
             try {
                 var url = new URL(scannedText);
-                var codeFromQuery = url.searchParams.get('code');
+                var codeFromQuery = url.searchParams.get(codeParamName) || url.searchParams.get('code');
                 if (codeFromQuery) {
                     return codeFromQuery;
                 }

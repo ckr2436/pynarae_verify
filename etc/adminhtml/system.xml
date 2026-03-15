@@ -130,6 +130,75 @@
                     <label>Show Scan Count</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+
+                <field id="qr_verify_base_url"
+                       translate="label"
+                       type="text"
+                       sortOrder="110"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>QR Verify Base URL</label>
+                    <comment>Optional. Used by CSV generator to build verify_url for QR codes. Leave empty to use current store /verify URL.</comment>
+                </field>
+
+                <field id="qr_code_param"
+                       translate="label"
+                       type="text"
+                       sortOrder="120"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>QR Code Parameter Name</label>
+                    <comment>Query parameter used in verify_url (for example: code).</comment>
+                </field>
+
+                <field id="qr_image_url_template"
+                       translate="label"
+                       type="text"
+                       sortOrder="130"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>QR Image URL Template</label>
+                    <comment>Optional. If set, CSV adds qr_image_url column. Supported placeholders: {VERIFY_URL}, {VERIFY_URL_ENCODED}, {CODE}, {CODE_ENCODED}.</comment>
+                </field>
+
+                <field id="secure_token_enabled"
+                       translate="label"
+                       type="select"
+                       sortOrder="140"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Enable Encrypted Verify Token</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>If enabled, QR verify URL uses encrypted token instead of plain code.</comment>
+                </field>
+
+                <field id="secure_token_key"
+                       translate="label"
+                       type="obscure"
+                       sortOrder="150"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Secure Token Secret Key</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>Required when encrypted verify token is enabled. Use a long random secret and keep it private.</comment>
+                </field>
+
+                <field id="secure_token_ttl_days"
+                       translate="label"
+                       type="text"
+                       sortOrder="160"
+                       showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Secure Token Expiry (Days)</label>
+                    <comment>0 means no expiry. Example: 365 for one year validity.</comment>
+                </field>
+
             </group>
         </section>
     </system>

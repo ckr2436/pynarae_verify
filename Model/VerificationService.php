@@ -20,13 +20,44 @@ class VerificationService
         private readonly RemoteAddress $remoteAddress,
         private readonly RequestInterface $request,
         private readonly Config $config,
-        private readonly CodeFormatter $codeFormatter
+        private readonly CodeFormatter $codeFormatter,
+        private readonly SecureTokenService $secureTokenService
     ) {
     }
 
     public function verify(string $rawCode): array
     {
-        $code = $this->codeFormatter->normalize($rawCode);
+        $submitted = trim($rawCode);
+        $decodedPayload = null;
+
+        if ($submitted === '') {
+            $this->logAttempt(null, '', false, 'empty');
+            return [
+                'status' => 'error',
+                'title' => (string)__('Code not found'),
+                'message' => $this->config->getInvalidMessage(),
+                'code' => '',
+                'matched' => false,
+            ];
+        }
+
+        if (str_starts_with($submitted, 'PV1.')) {
+            try {
+                $decodedPayload = $this->secureTokenService->parseToken($submitted);
+                $submitted = (string)($decodedPayload['code'] ?? '');
+            } catch (LocalizedException $e) {
+                $this->logAttempt(null, mb_substr($submitted, 0, 64), false, 'invalid_token');
+                return [
+                    'status' => 'error',
+                    'title' => (string)__('Code not found'),
+                    'message' => $this->config->getInvalidMessage(),
+                    'code' => mb_substr($rawCode, 0, 64),
+                    'matched' => false,
+                ];
+            }
+        }
+
+        $code = $this->codeFormatter->normalize($submitted);
 
         if ($code === '' || !$this->codeFormatter->isValidFormat($code)) {
             $this->logAttempt(null, $code, false, 'invalid_format');
@@ -118,8 +149,9 @@ class VerificationService
             'matched' => true,
             'is_first_scan' => $isFirstScan,
             'scan_count' => $newScanCount,
-            'product_sku' => (string)($row['product_sku'] ?? ''),
-            'batch_no' => (string)($row['batch_no'] ?? ''),
+            'product_sku' => (string)($row['product_sku'] ?? ($decodedPayload['sku'] ?? '')),
+            'batch_no' => (string)($row['batch_no'] ?? ($decodedPayload['batch'] ?? '')),
+            'product_name' => (string)($decodedPayload['product_name'] ?? ''),
             'first_scanned_at' => $isFirstScan ? $now : (string)($row['first_scanned_at'] ?? ''),
             'last_scanned_at' => $now,
         ];

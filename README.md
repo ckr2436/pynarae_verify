@@ -85,18 +85,47 @@ php bin/magento pynarae:verify:generate-csv \
   --prefix=PYN- \
   --sku=PYN-SERUM-30ML \
   --batch=L260315A \
+  --product-name="Repair Serum 30ml" \
   --output=var/export/pynarae_verify_codes.csv \
   --insert=1
 ```
 
-Generated CSV columns:
+Generated CSV columns (default):
 
 ```csv
-code,product_sku,batch_no,status,notes,meta_json,verify_url
+code,product_sku,batch_no,product_name,status,notes,meta_json,verify_value,verify_url
 ```
 
-`verify_url` can be directly converted to QR codes by your label/printing workflow for batch anti-counterfeit deployment.
+If encrypted token is enabled, CSV adds:
 
+```csv
+...,secure_token_enabled
+```
+
+If `QR Image URL Template` is configured, CSV also adds:
+
+```csv
+...,qr_image_url
+```
+
+This means each row has its own unique verify payload (`verify_value`) and URL (`verify_url`) for printing.
+
+
+
+
+## Offline batch generate QR images (SVG)
+
+```bash
+php bin/magento pynarae:verify:export-qr-images \
+  --input=var/export/pynarae_verify_codes.csv \
+  --output-dir=var/export/pynarae_verify_qr \
+  --url-column=verify_url \
+  --name-column=code \
+  --size=300 \
+  --margin=2
+```
+
+This command is fully offline and generates one SVG QR image per CSV row.
 
 ## Scan history API (Admin)
 
@@ -115,6 +144,28 @@ Response fields include each scan's timestamp (`scanned_at`), `ip`, `user_agent`
 - `Pynarae > Verify Codes`
 - `Pynarae > Scan Logs`
 - `Pynarae > Settings`
+
+### QR code generation config
+
+In `Stores > Configuration > Pynarae > Product Verify > General`, you can now set:
+
+- `QR Verify Base URL`: the base URL used to build `verify_url` in generated CSV (for example `https://verify.pynarae.com/check`). If empty, module uses current store `https://<store>/verify`.
+- `QR Code Parameter Name`: query parameter name used in `verify_url` (default: `code`).
+- `QR Image URL Template`: optional QR image template. If configured, generated CSV includes `qr_image_url` for every unique code.
+  - Supported placeholders: `{VERIFY_URL}`, `{VERIFY_URL_ENCODED}`, `{CODE}`, `{CODE_ENCODED}`
+  - Example template: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={VERIFY_URL_ENCODED}`
+
+- `Enable Encrypted Verify Token`: if enabled, verify URL carries encrypted token instead of plaintext code.
+- `Secure Token Secret Key`: required for encryption/decryption and signature verification.
+- `Secure Token Expiry (Days)`: optional token expiration in days (`0` = never expires).
+
+When enabled, generated token payload includes `code`, `product_name`, `sku`, `batch`, and random/signature context, and verification decrypts this payload before checking authenticity.
+
+Example generated URL with custom config:
+
+```text
+https://verify.pynarae.com/check?vc=PYN-ABCD1234EFGH
+```
 
 ## Notes
 

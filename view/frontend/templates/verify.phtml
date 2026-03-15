@@ -23,7 +23,7 @@ $submittedCode = $block->getSubmittedCode();
                 <input class="pynarae-verify__input"
                        type="text"
                        id="verify-code"
-                       name="code"
+                       name="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
                        value="<?= $block->escapeHtmlAttr($submittedCode) ?>"
                        placeholder="<?= $block->escapeHtmlAttr(__('Enter your code')) ?>"
                        autocomplete="off"
@@ -33,7 +33,7 @@ $submittedCode = $block->getSubmittedCode();
                 </button>
             </form>
 
-            <div class="pynarae-verify__scanner" data-role="qr-scanner">
+            <div class="pynarae-verify__scanner" data-role="qr-scanner" data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>">
                 <button class="action secondary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
                     <span><?= $block->escapeHtml(__('Scan QR code with camera')) ?></span>
                 </button>
@@ -68,6 +68,15 @@ $submittedCode = $block->getSubmittedCode();
                             <th><?= $block->escapeHtml(__('Validity')) ?></th>
                             <td><?= !empty($result['matched']) ? $block->escapeHtml(__('Valid')) : $block->escapeHtml(__('Invalid')) ?></td>
                         </tr>
+
+
+
+                        <?php if (!empty($result['product_name'])): ?>
+                            <tr>
+                                <th><?= $block->escapeHtml(__('Product Name')) ?></th>
+                                <td><?= $block->escapeHtml($result['product_name']) ?></td>
+                            </tr>
+                        <?php endif; ?>
 
                         <?php if ($block->shouldShowProductSku() && !empty($result['product_sku'])): ?>
                             <tr>

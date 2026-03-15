@@ -49,7 +49,18 @@ class Verify extends Template
 
     public function getSubmittedCode(): string
     {
-        return trim((string)$this->request->getParam('code', ''));
+        $paramName = $this->getCodeParam();
+        $value = trim((string)$this->request->getParam($paramName, ''));
+        if ($value === '' && $paramName !== 'code') {
+            $value = trim((string)$this->request->getParam('code', ''));
+        }
+
+        return $value;
+    }
+
+    public function getCodeParam(): string
+    {
+        return $this->config->getQrCodeParam();
     }
 
     public function getVerificationResult(): ?array
