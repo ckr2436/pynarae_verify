@@ -14,6 +14,12 @@
                 <show_product_sku>1</show_product_sku>
                 <show_batch_no>1</show_batch_no>
                 <show_scan_count>1</show_scan_count>
+                <qr_verify_base_url></qr_verify_base_url>
+                <qr_code_param>code</qr_code_param>
+                <qr_image_url_template></qr_image_url_template>
+                <secure_token_enabled>0</secure_token_enabled>
+                <secure_token_key></secure_token_key>
+                <secure_token_ttl_days>0</secure_token_ttl_days>
             </general>
         </pynarae_verify>
     </default>

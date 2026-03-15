@@ -9,6 +9,8 @@ use Magento\Framework\Console\Cli;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Pynarae\Verify\Model\CodeGenerator;
+use Pynarae\Verify\Model\Config;
+use Pynarae\Verify\Model\SecureTokenService;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,6 +22,8 @@ class GenerateCsvCommand extends Command
         private readonly ResourceConnection $resourceConnection,
         private readonly CodeGenerator $codeGenerator,
         private readonly StoreManagerInterface $storeManager,
+        private readonly Config $config,
+        private readonly SecureTokenService $secureTokenService,
         ?string $name = null
     ) {
         parent::__construct($name);
@@ -34,6 +38,7 @@ class GenerateCsvCommand extends Command
             ->addOption('prefix', null, InputOption::VALUE_OPTIONAL, 'Code prefix', 'PYN-')
             ->addOption('sku', null, InputOption::VALUE_OPTIONAL, 'Product SKU', '')
             ->addOption('batch', null, InputOption::VALUE_OPTIONAL, 'Batch number', '')
+            ->addOption('product-name', null, InputOption::VALUE_OPTIONAL, 'Product name', '')
             ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Status (1 enabled, 0 disabled)', '1')
             ->addOption('notes', null, InputOption::VALUE_OPTIONAL, 'Notes', '')
             ->addOption('meta-json', null, InputOption::VALUE_OPTIONAL, 'Meta JSON payload', '')
@@ -48,6 +53,7 @@ class GenerateCsvCommand extends Command
         $prefix = (string)$input->getOption('prefix');
         $sku = trim((string)$input->getOption('sku'));
         $batch = trim((string)$input->getOption('batch'));
+        $productName = trim((string)$input->getOption('product-name'));
         $status = ((int)$input->getOption('status')) === 0 ? 0 : 1;
         $notes = trim((string)$input->getOption('notes'));
         $metaJson = trim((string)$input->getOption('meta-json'));
@@ -81,8 +87,17 @@ class GenerateCsvCommand extends Command
 
         $codes = $this->codeGenerator->generateBatch($count, $length, $prefix, $existsCallback);
 
-        $storeBaseUrl = rtrim($this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB), '/');
-        $verifyBaseUrl = $storeBaseUrl . '/verify';
+        $configuredBaseUrl = rtrim($this->config->getQrVerifyBaseUrl(), '/');
+        if ($configuredBaseUrl === '') {
+            $storeBaseUrl = rtrim($this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB), '/');
+            $configuredBaseUrl = $storeBaseUrl . '/verify';
+        }
+
+        $paramName = $this->config->getQrCodeParam();
+        $verifySeparator = str_contains($configuredBaseUrl, '?') ? '&' : '?';
+        $qrImageTemplate = $this->config->getQrImageUrlTemplate();
+        $includeQrImageUrl = $qrImageTemplate !== '';
+        $secureTokenEnabled = $this->secureTokenService->isEnabled();
 
         $directory = dirname($outputPath);
         if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -96,18 +111,56 @@ class GenerateCsvCommand extends Command
             return Cli::RETURN_FAILURE;
         }
 
-        fputcsv($handle, ['code', 'product_sku', 'batch_no', 'status', 'notes', 'meta_json', 'verify_url']);
+        $header = ['code', 'product_sku', 'batch_no', 'product_name', 'status', 'notes', 'meta_json', 'verify_value', 'verify_url'];
+        if ($secureTokenEnabled) {
+            $header[] = 'secure_token_enabled';
+        }
+
+        if ($includeQrImageUrl) {
+            $header[] = 'qr_image_url';
+        }
+
+        fputcsv($handle, $header);
 
         foreach ($codes as $code) {
-            fputcsv($handle, [
+            $verifyValue = $code;
+            if ($secureTokenEnabled) {
+                $verifyValue = $this->secureTokenService->generateToken([
+                    'code' => $code,
+                    'sku' => $sku,
+                    'batch' => $batch,
+                    'product_name' => $productName,
+                    'rnd' => substr(hash('sha256', $code . '|' . microtime(true)), 0, 16),
+                ]);
+            }
+
+            $verifyUrl = $configuredBaseUrl . $verifySeparator . http_build_query([$paramName => $verifyValue]);
+            $row = [
                 $code,
                 $sku,
                 $batch,
+                $productName,
                 $status,
                 $notes,
                 $metaJson,
-                $verifyBaseUrl . '?code=' . rawurlencode($code),
-            ]);
+                $verifyValue,
+                $verifyUrl,
+            ];
+
+            if ($secureTokenEnabled) {
+                $row[] = 1;
+            }
+
+            if ($includeQrImageUrl) {
+                $row[] = strtr($qrImageTemplate, [
+                    '{VERIFY_URL}' => $verifyUrl,
+                    '{VERIFY_URL_ENCODED}' => rawurlencode($verifyUrl),
+                    '{CODE}' => $code,
+                    '{CODE_ENCODED}' => rawurlencode($code),
+                ]);
+            }
+
+            fputcsv($handle, $row);
         }
 
         fclose($handle);
