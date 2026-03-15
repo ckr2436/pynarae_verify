@@ -1,0 +1,117 @@
+<?php
+/** @var \Pynarae\Verify\Block\Adminhtml\Generate\Form $block */
+$formKey = $block->getFormKey();
+?>
+<div class="admin__page-section">
+    <div class="admin__page-section-title"><span class="title">Batch Generate Anti-Counterfeit QR Package</span></div>
+    <div class="admin__page-section-content">
+        <form method="post" action="<?= $block->escapeUrl($block->getSubmitUrl()) ?>" class="admin__fieldset">
+            <input type="hidden" name="form_key" value="<?= $block->escapeHtmlAttr($formKey) ?>" />
+
+            <fieldset class="admin__fieldset">
+                <legend class="admin__legend"><span>Product & Batch Parameters</span></legend>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="product_name"><span>Product Name</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="product_name" id="product_name" required /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="product_sku"><span>Product SKU</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="product_sku" id="product_sku" /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="batch_no"><span>Batch Number</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="batch_no" id="batch_no" required /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="notes"><span>Batch Notes</span></label>
+                    <div class="admin__field-control"><textarea class="admin__control-textarea" name="notes" id="notes"></textarea></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="meta_json"><span>Meta JSON</span></label>
+                    <div class="admin__field-control"><textarea class="admin__control-textarea" name="meta_json" id="meta_json" placeholder='{"factory":"A1","channel":"offline"}'></textarea></div>
+                </div>
+            </fieldset>
+
+            <fieldset class="admin__fieldset">
+                <legend class="admin__legend"><span>Generation Parameters</span></legend>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="count"><span>QR Code Quantity</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="1" max="50000" name="count" id="count" value="<?= (int)$block->getDefaultCount() ?>" required /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="prefix"><span>Code Prefix</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="prefix" id="prefix" value="<?= $block->escapeHtmlAttr($block->getDefaultPrefix()) ?>" required /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="length"><span>Random Body Length</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="6" max="48" name="length" id="length" value="<?= (int)$block->getDefaultCodeLength() ?>" required /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="status"><span>Code Status</span></label>
+                    <div class="admin__field-control">
+                        <select class="admin__control-select" name="status" id="status">
+                            <option value="1" selected>Enabled</option>
+                            <option value="0">Disabled</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="insert_db"><span>Insert to Verify Code DB</span></label>
+                    <div class="admin__field-control">
+                        <select class="admin__control-select" name="insert_db" id="insert_db">
+                            <option value="1" selected>Yes</option>
+                            <option value="0">No</option>
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="admin__fieldset">
+                <legend class="admin__legend"><span>QR Packaging Parameters</span></legend>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="include_qr_svg"><span>Generate QR SVG Files</span></label>
+                    <div class="admin__field-control">
+                        <select class="admin__control-select" name="include_qr_svg" id="include_qr_svg">
+                            <option value="1" selected>Yes</option>
+                            <option value="0">No (CSV only)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="qr_size"><span>QR Size (px)</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="120" max="2000" name="qr_size" id="qr_size" value="300" /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="qr_margin"><span>QR Margin</span></label>
+                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="0" max="20" name="qr_margin" id="qr_margin" value="2" /></div>
+                </div>
+
+                <div class="admin__field field">
+                    <label class="admin__field-label" for="secure_token_tip"><span>Encrypted Token Status</span></label>
+                    <div class="admin__field-control">
+                        <input class="admin__control-text" id="secure_token_tip" type="text" value="<?= $block->isSecureTokenEnabled() ? 'Enabled via system config' : 'Disabled via system config' ?>" readonly />
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="admin__field field">
+                <div class="admin__field-control">
+                    <button type="submit" class="action-primary scalable primary"><span>Generate Package Now</span></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

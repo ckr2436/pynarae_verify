@@ -14,6 +14,7 @@ Production-ready Magento 2 authenticity verification module for `pynarae.com`.
 - Configurable customer-facing messages
 - Admin management pages:
   - Verify Codes
+  - Batch Generate (production batch QR package)
   - Scan Logs
 - Admin create / edit / delete
 - Admin mass actions:
@@ -199,3 +200,26 @@ For this module specifically, ACL resource definitions are in `etc/acl.xml`, and
 ## Package contents
 
 This ZIP contains the full module source. No file is omitted.
+
+
+### Production batch generation in Admin
+
+Open `Pynarae > Batch Generate` and fill:
+
+- Product name / SKU / batch number
+- Quantity (how many anti-counterfeit QR codes to generate)
+- Prefix and random length
+- Notes and optional metadata JSON
+- Whether to insert generated codes directly into verify DB
+- Whether to generate QR SVG files for print packaging
+
+After submit, system generates:
+
+- CSV download URL
+- ZIP package download URL (contains CSV + QR SVG files)
+
+Output is stored under:
+
+```text
+var/export/pynarae_verify_packages/<timestamp>_<batch>/
+```
