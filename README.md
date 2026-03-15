@@ -122,6 +122,29 @@ Response fields include each scan's timestamp (`scanned_at`), `ip`, `user_agent`
 - Code format is normalized to uppercase and trimmed before validation.
 - Invalid lookups are logged too, which helps detect abuse or counterfeit attempts.
 
+## Troubleshooting
+
+### Admin login error: `Could not create an acl object ... DOMXPath::query(): Invalid expression`
+
+This Magento error means at least one ACL XML resource id is malformed (in this module or another installed module).
+
+Recommended checks:
+
+1. Validate every `etc/acl.xml` file and ensure each `resource id` follows Magento conventions (for example `Vendor_Module::permission_key`, only letters/numbers/underscore).
+2. Confirm every ACL id referenced by:
+   - `etc/adminhtml/menu.xml` (`resource="..."`)
+   - `etc/adminhtml/system.xml` (`<resource>...</resource>`)
+   - admin controllers (`ADMIN_RESOURCE` constants)
+   exists in some `etc/acl.xml`.
+3. Rebuild metadata/cache:
+
+```bash
+php bin/magento cache:flush
+php bin/magento setup:di:compile
+```
+
+For this module specifically, ACL resource definitions are in `etc/acl.xml`, and the file now uses the Magento 2.4.x recommended root structure: `<config><acl><resources>...</resources></acl></config>`.
+
 ## Package contents
 
 This ZIP contains the full module source. No file is omitted.
