@@ -26,7 +26,6 @@ class Index extends Action implements HttpGetActionInterface
     public function execute(): ResultInterface
     {
         $resultPage = $this->pageFactory->create();
-        $resultPage->setActiveMenu('Pynarae_Verify::generate');
         $resultPage->getConfig()->getTitle()->prepend(__('Batch Generate Verify QR Package'));
 
         return $resultPage;
