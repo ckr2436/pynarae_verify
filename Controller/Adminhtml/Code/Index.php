@@ -26,7 +26,6 @@ class Index extends Action implements HttpGetActionInterface
     public function execute(): ResultInterface
     {
         $resultPage = $this->pageFactory->create();
-        $resultPage->setActiveMenu('Pynarae_Verify::codes');
         $resultPage->getConfig()->getTitle()->prepend(__('Verify Codes'));
 
         return $resultPage;
