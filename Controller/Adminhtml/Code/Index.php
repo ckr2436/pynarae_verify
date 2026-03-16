@@ -21,7 +21,6 @@ class Index extends Action
     public function execute()
     {
         $resultPage = $this->pageFactory->create();
-        $resultPage->setActiveMenu('Pynarae_Verify::codes_menu');
         $resultPage->getConfig()->getTitle()->prepend(__('Verify Codes'));
         return $resultPage;
     }

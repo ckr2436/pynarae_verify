@@ -143,6 +143,7 @@ Response fields include each scan's timestamp (`scanned_at`), `ip`, `user_agent`
 ## Admin pages
 
 - `Pynarae > Verify Codes`
+- `Pynarae > Batch Generate`
 - `Pynarae > Scan Logs`
 - `Pynarae > Settings`
 

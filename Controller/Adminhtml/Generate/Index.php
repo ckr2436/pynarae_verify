@@ -21,7 +21,6 @@ class Index extends Action
     public function execute()
     {
         $resultPage = $this->pageFactory->create();
-        $resultPage->setActiveMenu('Pynarae_Verify::generate_menu');
         $resultPage->getConfig()->getTitle()->prepend(__('Batch Generate Verify QR Package'));
 
         return $resultPage;

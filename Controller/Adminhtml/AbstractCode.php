@@ -27,7 +27,6 @@ abstract class AbstractCode extends Action
 
     protected function initPage($resultPage)
     {
-        $resultPage->setActiveMenu('Pynarae_Verify::codes_menu');
         $resultPage->addBreadcrumb(__('Pynarae'), __('Pynarae'));
         $resultPage->addBreadcrumb(__('Verify Codes'), __('Verify Codes'));
         return $resultPage;
