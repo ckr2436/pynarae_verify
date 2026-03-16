@@ -17,8 +17,8 @@ class Form extends Generic
         \Magento\Backend\Block\Template\Context $context,
         Registry $registry,
         FormFactory $formFactory,
-        private readonly Status $statusSource,
-        private readonly DataPersistorInterface $dataPersistor,
+        private Status $statusSource,
+        private DataPersistorInterface $dataPersistor,
         array $data = []
     ) {
         parent::__construct($context, $registry, $formFactory, $data);

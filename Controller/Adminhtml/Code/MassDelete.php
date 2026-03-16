@@ -14,8 +14,8 @@ class MassDelete extends Action
 
     public function __construct(
         Action\Context $context,
-        private readonly Filter $filter,
-        private readonly CollectionFactory $collectionFactory
+        private Filter $filter,
+        private CollectionFactory $collectionFactory
     ) {
         parent::__construct($context);
     }

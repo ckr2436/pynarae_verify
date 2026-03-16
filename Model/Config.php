@@ -27,7 +27,7 @@ class Config
     private const XML_PATH_SECURE_TOKEN_TTL_DAYS = 'pynarae_verify/general/secure_token_ttl_days';
 
     public function __construct(
-        private readonly ScopeConfigInterface $scopeConfig
+        private ScopeConfigInterface $scopeConfig
     ) {
     }
 

@@ -15,9 +15,9 @@ class History extends Action
 
     public function __construct(
         Action\Context $context,
-        private readonly JsonFactory $jsonFactory,
-        private readonly ResourceConnection $resourceConnection,
-        private readonly CodeFormatter $codeFormatter
+        private JsonFactory $jsonFactory,
+        private ResourceConnection $resourceConnection,
+        private CodeFormatter $codeFormatter
     ) {
         parent::__construct($context);
     }

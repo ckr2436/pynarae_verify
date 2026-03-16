@@ -16,8 +16,8 @@ class Download extends Action
 
     public function __construct(
         Action\Context $context,
-        private readonly FileFactory $fileFactory,
-        private readonly Filesystem $filesystem
+        private FileFactory $fileFactory,
+        private Filesystem $filesystem
     ) {
         parent::__construct($context);
     }

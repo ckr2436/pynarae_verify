@@ -12,7 +12,7 @@ class Edit extends Container
 {
     public function __construct(
         \Magento\Backend\Block\Widget\Context $context,
-        private readonly Registry $coreRegistry,
+        private Registry $coreRegistry,
         array $data = []
     ) {
         parent::__construct($context, $data);

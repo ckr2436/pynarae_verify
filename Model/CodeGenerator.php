@@ -9,7 +9,7 @@ class CodeGenerator
     private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     public function __construct(
-        private readonly CodeFormatter $codeFormatter
+        private CodeFormatter $codeFormatter
     ) {
     }
 

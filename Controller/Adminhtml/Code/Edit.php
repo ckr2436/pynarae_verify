@@ -16,7 +16,7 @@ class Edit extends AbstractCode
         \Magento\Framework\Registry $coreRegistry,
         \Pynarae\Verify\Model\CodeFactory $codeFactory,
         \Pynarae\Verify\Model\ResourceModel\Code $codeResource,
-        private readonly PageFactory $pageFactory
+        private PageFactory $pageFactory
     ) {
         parent::__construct($context, $coreRegistry, $codeFactory, $codeResource);
     }

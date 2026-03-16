@@ -19,11 +19,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 class GenerateCsvCommand extends Command
 {
     public function __construct(
-        private readonly ResourceConnection $resourceConnection,
-        private readonly CodeGenerator $codeGenerator,
-        private readonly StoreManagerInterface $storeManager,
-        private readonly Config $config,
-        private readonly SecureTokenService $secureTokenService,
+        private ResourceConnection $resourceConnection,
+        private CodeGenerator $codeGenerator,
+        private StoreManagerInterface $storeManager,
+        private Config $config,
+        private SecureTokenService $secureTokenService,
         ?string $name = null
     ) {
         parent::__construct($name);

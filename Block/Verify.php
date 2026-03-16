@@ -18,9 +18,9 @@ class Verify extends Template
 
     public function __construct(
         Context $context,
-        private readonly Config $config,
-        private readonly RequestInterface $request,
-        private readonly VerificationService $verificationService,
+        private Config $config,
+        private RequestInterface $request,
+        private VerificationService $verificationService,
         array $data = []
     ) {
         parent::__construct($context, $data);

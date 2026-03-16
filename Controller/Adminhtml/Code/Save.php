@@ -19,8 +19,8 @@ class Save extends AbstractCode
         \Magento\Framework\Registry $coreRegistry,
         \Pynarae\Verify\Model\CodeFactory $codeFactory,
         \Pynarae\Verify\Model\ResourceModel\Code $codeResource,
-        private readonly DataPersistorInterface $dataPersistor,
-        private readonly CodeFormatter $codeFormatter
+        private DataPersistorInterface $dataPersistor,
+        private CodeFormatter $codeFormatter
     ) {
         parent::__construct($context, $coreRegistry, $codeFactory, $codeResource);
     }

@@ -18,8 +18,8 @@ class ImportCsvCommand extends Command
     private const ARG_FILE = 'file';
 
     public function __construct(
-        private readonly ResourceConnection $resourceConnection,
-        private readonly CodeFormatter $codeFormatter,
+        private ResourceConnection $resourceConnection,
+        private CodeFormatter $codeFormatter,
         ?string $name = null
     ) {
         parent::__construct($name);
