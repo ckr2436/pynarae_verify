@@ -5,31 +5,30 @@ declare(strict_types=1);
 namespace Pynarae\Verify\Controller\Adminhtml\Code;
 
 use Magento\Backend\App\Action;
-use Magento\Backend\Model\Menu\Config as MenuConfig;
 use Magento\Backend\Model\View\Result\PageFactory;
 use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\Controller\ResultInterface;
 
 class Index extends Action implements HttpGetActionInterface
 {
     public const ADMIN_RESOURCE = 'Pynarae_Verify::codes';
 
+    private PageFactory $pageFactory;
+
     public function __construct(
         Action\Context $context,
-        private PageFactory $pageFactory,
-        private MenuConfig $menuConfig
+        PageFactory $pageFactory
     ) {
         parent::__construct($context);
+        $this->pageFactory = $pageFactory;
     }
 
-    public function execute()
+    public function execute(): ResultInterface
     {
         $resultPage = $this->pageFactory->create();
-
-        if ($this->menuConfig->getMenu()->get('Pynarae_Verify::codes_menu')) {
-            $resultPage->setActiveMenu('Pynarae_Verify::codes_menu');
-        }
-
+        $resultPage->setActiveMenu('Pynarae_Verify::codes');
         $resultPage->getConfig()->getTitle()->prepend(__('Verify Codes'));
+
         return $resultPage;
     }
 }
