@@ -9,6 +9,7 @@
                         <resource id="Pynarae_Verify::save" title="Save Codes" sortOrder="10"/>
                         <resource id="Pynarae_Verify::delete" title="Delete Codes" sortOrder="20"/>
                     </resource>
+                    <resource id="Pynarae_Verify::generate" title="Batch Generate" sortOrder="15"/>
                     <resource id="Pynarae_Verify::logs" title="Scan Logs" sortOrder="20"/>
                     <resource id="Pynarae_Verify::config" title="Settings" sortOrder="30"/>
                 </resource>
