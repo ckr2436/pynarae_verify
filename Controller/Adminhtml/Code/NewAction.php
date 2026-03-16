@@ -6,7 +6,9 @@ namespace Pynarae\Verify\Controller\Adminhtml\Code;
 
 use Pynarae\Verify\Controller\Adminhtml\AbstractCode;
 
-class NewAction extends AbstractCode
+use Magento\Framework\App\Action\HttpGetActionInterface;
+
+class NewAction extends AbstractCode implements HttpGetActionInterface
 {
     public const ADMIN_RESOURCE = 'Pynarae_Verify::save';
 
