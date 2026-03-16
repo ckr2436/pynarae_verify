@@ -7,7 +7,9 @@ namespace Pynarae\Verify\Controller\Adminhtml\Generate;
 use Magento\Backend\App\Action;
 use Magento\Backend\Model\View\Result\PageFactory;
 
-class Index extends Action
+use Magento\Framework\App\Action\HttpGetActionInterface;
+
+class Index extends Action implements HttpGetActionInterface
 {
     public const ADMIN_RESOURCE = 'Pynarae_Verify::generate';
 

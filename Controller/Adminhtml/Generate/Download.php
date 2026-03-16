@@ -10,7 +10,9 @@ use Magento\Framework\App\Response\Http\FileFactory;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Filesystem;
 
-class Download extends Action
+use Magento\Framework\App\Action\HttpGetActionInterface;
+
+class Download extends Action implements HttpGetActionInterface
 {
     public const ADMIN_RESOURCE = 'Pynarae_Verify::generate';
 

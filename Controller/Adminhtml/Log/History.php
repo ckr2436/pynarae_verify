@@ -9,7 +9,9 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Pynarae\Verify\Model\CodeFormatter;
 
-class History extends Action
+use Magento\Framework\App\Action\HttpGetActionInterface;
+
+class History extends Action implements HttpGetActionInterface
 {
     public const ADMIN_RESOURCE = 'Pynarae_Verify::logs';
 
