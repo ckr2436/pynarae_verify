@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ExportQrImagesCommand extends Command
 {
     public function __construct(
-        private readonly QrSvgGenerator $qrSvgGenerator,
+        private QrSvgGenerator $qrSvgGenerator,
         ?string $name = null
     ) {
         parent::__construct($name);

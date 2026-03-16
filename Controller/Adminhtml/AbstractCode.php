@@ -18,9 +18,9 @@ abstract class AbstractCode extends Action
 
     public function __construct(
         Context $context,
-        protected readonly Registry $coreRegistry,
-        protected readonly CodeFactory $codeFactory,
-        protected readonly CodeResource $codeResource
+        protected Registry $coreRegistry,
+        protected CodeFactory $codeFactory,
+        protected CodeResource $codeResource
     ) {
         parent::__construct($context);
     }

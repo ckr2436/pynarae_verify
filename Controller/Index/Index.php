@@ -12,7 +12,7 @@ class Index extends Action
 {
     public function __construct(
         Context $context,
-        private readonly PageFactory $pageFactory
+        private PageFactory $pageFactory
     ) {
         parent::__construct($context);
     }

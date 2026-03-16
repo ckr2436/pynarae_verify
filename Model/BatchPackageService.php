@@ -16,14 +16,14 @@ use Magento\Store\Model\StoreManagerInterface;
 class BatchPackageService
 {
     public function __construct(
-        private readonly ResourceConnection $resourceConnection,
-        private readonly CodeGenerator $codeGenerator,
-        private readonly Config $config,
-        private readonly SecureTokenService $secureTokenService,
-        private readonly QrSvgGenerator $qrSvgGenerator,
-        private readonly StoreManagerInterface $storeManager,
-        private readonly Filesystem $filesystem,
-        private readonly DateTime $dateTime
+        private ResourceConnection $resourceConnection,
+        private CodeGenerator $codeGenerator,
+        private Config $config,
+        private SecureTokenService $secureTokenService,
+        private QrSvgGenerator $qrSvgGenerator,
+        private StoreManagerInterface $storeManager,
+        private Filesystem $filesystem,
+        private DateTime $dateTime
     ) {
     }
 

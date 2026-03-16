@@ -15,8 +15,8 @@ class Run extends Action
 
     public function __construct(
         Action\Context $context,
-        private readonly FormKeyValidator $formKeyValidator,
-        private readonly BatchPackageService $batchPackageService
+        private FormKeyValidator $formKeyValidator,
+        private BatchPackageService $batchPackageService
     ) {
         parent::__construct($context);
     }

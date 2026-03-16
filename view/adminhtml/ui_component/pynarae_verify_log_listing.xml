@@ -4,6 +4,7 @@
     <argument name="data" xsi:type="array">
         <item name="js_config" xsi:type="array">
             <item name="provider" xsi:type="string">pynarae_verify_log_listing.pynarae_verify_log_listing_data_source</item>
+            <item name="deps" xsi:type="string">pynarae_verify_log_listing.pynarae_verify_log_listing_data_source</item>
         </item>
         <item name="spinner" xsi:type="string">pynarae_verify_log_columns</item>
     </argument>

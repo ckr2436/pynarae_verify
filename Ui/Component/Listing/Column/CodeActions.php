@@ -18,8 +18,8 @@ class CodeActions extends Column
     public function __construct(
         ContextInterface $context,
         UiComponentFactory $uiComponentFactory,
-        private readonly UrlInterface $urlBuilder,
-        private readonly Escaper $escaper,
+        private UrlInterface $urlBuilder,
+        private Escaper $escaper,
         array $components = [],
         array $data = []
     ) {

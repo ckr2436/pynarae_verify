@@ -15,13 +15,13 @@ use Pynarae\Verify\Model\Source\Status;
 class VerificationService
 {
     public function __construct(
-        private readonly ResourceConnection $resourceConnection,
-        private readonly DateTime $dateTime,
-        private readonly RemoteAddress $remoteAddress,
-        private readonly RequestInterface $request,
-        private readonly Config $config,
-        private readonly CodeFormatter $codeFormatter,
-        private readonly SecureTokenService $secureTokenService
+        private ResourceConnection $resourceConnection,
+        private DateTime $dateTime,
+        private RemoteAddress $remoteAddress,
+        private RequestInterface $request,
+        private Config $config,
+        private CodeFormatter $codeFormatter,
+        private SecureTokenService $secureTokenService
     ) {
     }
 

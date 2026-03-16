@@ -11,7 +11,7 @@ class SecureTokenService
     private const TOKEN_PREFIX = 'PV1';
 
     public function __construct(
-        private readonly Config $config
+        private Config $config
     ) {
     }
 

@@ -13,7 +13,7 @@ class Form extends Template
 
     public function __construct(
         Template\Context $context,
-        private readonly Config $config,
+        private Config $config,
         array $data = []
     ) {
         parent::__construct($context, $data);
