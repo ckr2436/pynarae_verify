@@ -6,8 +6,8 @@ namespace Pynarae\Verify\Controller\Adminhtml\Log;
 
 use Magento\Backend\App\Action;
 use Magento\Backend\Model\View\Result\PageFactory;
-
 use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\Controller\ResultInterface;
 
 class Index extends Action implements HttpGetActionInterface
 {
@@ -20,10 +20,11 @@ class Index extends Action implements HttpGetActionInterface
         parent::__construct($context);
     }
 
-    public function execute()
+    public function execute(): ResultInterface
     {
         $resultPage = $this->pageFactory->create();
         $resultPage->getConfig()->getTitle()->prepend(__('Scan Logs'));
+
         return $resultPage;
     }
 }

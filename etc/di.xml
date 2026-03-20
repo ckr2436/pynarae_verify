@@ -7,7 +7,7 @@
             <argument name="commands" xsi:type="array">
                 <item name="pynarae_verify_import_csv" xsi:type="object">Pynarae\Verify\Console\Command\ImportCsvCommand</item>
                 <item name="pynarae_verify_generate_csv" xsi:type="object">Pynarae\Verify\Console\Command\GenerateCsvCommand</item>
-                            <item name="pynarae_verify_export_qr_images" xsi:type="object">Pynarae\Verify\Console\Command\ExportQrImagesCommand</item>
+                <item name="pynarae_verify_export_qr_images" xsi:type="object">Pynarae\Verify\Console\Command\ExportQrImagesCommand</item>
             </argument>
         </arguments>
     </type>
