@@ -4,14 +4,16 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Pynarae_Verify::root" title="Pynarae Verify" sortOrder="950">
-                    <resource id="Pynarae_Verify::codes" title="Verify Codes" sortOrder="10">
-                        <resource id="Pynarae_Verify::save" title="Save Codes" sortOrder="10"/>
-                        <resource id="Pynarae_Verify::delete" title="Delete Codes" sortOrder="20"/>
+                <resource id="Magento_Backend::content">
+                    <resource id="Pynarae_Verify::root" title="Pynarae Verify" sortOrder="950">
+                        <resource id="Pynarae_Verify::codes" title="Verify Codes" sortOrder="10">
+                            <resource id="Pynarae_Verify::save" title="Save Codes" sortOrder="10"/>
+                            <resource id="Pynarae_Verify::delete" title="Delete Codes" sortOrder="20"/>
+                        </resource>
+                        <resource id="Pynarae_Verify::generate" title="Batch Generate" sortOrder="15"/>
+                        <resource id="Pynarae_Verify::logs" title="Scan Logs" sortOrder="20"/>
+                        <resource id="Pynarae_Verify::config" title="Settings" sortOrder="30"/>
                     </resource>
-                    <resource id="Pynarae_Verify::generate" title="Batch Generate" sortOrder="15"/>
-                    <resource id="Pynarae_Verify::logs" title="Scan Logs" sortOrder="20"/>
-                    <resource id="Pynarae_Verify::config" title="Settings" sortOrder="30"/>
                 </resource>
             </resource>
         </resources>
