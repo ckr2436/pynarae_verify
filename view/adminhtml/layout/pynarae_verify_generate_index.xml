@@ -2,6 +2,11 @@
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
+        <referenceBlock name="menu">
+            <action method="setActive">
+                <argument name="itemId" xsi:type="string">Pynarae_Verify::generate</argument>
+            </action>
+        </referenceBlock>
         <referenceContainer name="content">
             <block class="Pynarae\Verify\Block\Adminhtml\Generate\Form"
                    name="pynarae.verify.generate.form"
