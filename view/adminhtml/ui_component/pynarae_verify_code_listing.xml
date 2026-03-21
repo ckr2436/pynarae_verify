@@ -9,42 +9,115 @@
         <item name="spinner" xsi:type="string">pynarae_verify_code_columns</item>
     </argument>
 
-    <dataSource name="pynarae_verify_code_listing_data_source">
-        <argument name="dataProvider" xsi:type="configurableObject">
-            <argument name="class" xsi:type="string">Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider</argument>
-            <argument name="name" xsi:type="string">pynarae_verify_code_listing_data_source</argument>
-            <argument name="primaryFieldName" xsi:type="string">entity_id</argument>
-            <argument name="requestFieldName" xsi:type="string">entity_id</argument>
-            <argument name="data" xsi:type="array">
-                <item name="config" xsi:type="array">
-                    <item name="component" xsi:type="string">Magento_Ui/js/grid/provider</item>
-                    <item name="update_url" xsi:type="url" path="mui/index/render"/>
-                    <item name="storageConfig" xsi:type="array">
-                        <item name="indexField" xsi:type="string">entity_id</item>
-                    </item>
-                </item>
-            </argument>
-        </argument>
-        <argument name="data" xsi:type="array">
-            <item name="js_config" xsi:type="array">
-                <item name="component" xsi:type="string">Magento_Ui/js/grid/provider</item>
-            </item>
-        </argument>
+    <settings>
+        <buttons>
+            <button name="add">
+                <url path="pynarae_verify/code/new"/>
+                <class>primary</class>
+                <label translate="true">Add Verification Code</label>
+            </button>
+        </buttons>
+        <deps>
+            <dep>pynarae_verify_code_listing.pynarae_verify_code_listing_data_source</dep>
+        </deps>
+    </settings>
+
+    <dataSource name="pynarae_verify_code_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">entity_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Pynarae_Verify::codes</aclResource>
+        <dataProvider name="pynarae_verify_code_listing_data_source"
+                      class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider">
+            <settings>
+                <requestFieldName>entity_id</requestFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
     </dataSource>
 
     <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
         <filters name="listing_filters"/>
+        <massaction name="listing_massaction" component="Magento_Ui/js/grid/tree-massactions">
+            <settings>
+                <indexField>entity_id</indexField>
+                <selectProvider>pynarae_verify_code_listing.pynarae_verify_code_listing.pynarae_verify_code_columns.ids</selectProvider>
+            </settings>
+            <action name="enable">
+                <settings>
+                    <type>enable</type>
+                    <label translate="true">Enable</label>
+                    <url path="pynarae_verify/code/massStatus">
+                        <param name="status">1</param>
+                    </url>
+                </settings>
+            </action>
+            <action name="disable">
+                <settings>
+                    <type>disable</type>
+                    <label translate="true">Disable</label>
+                    <url path="pynarae_verify/code/massStatus">
+                        <param name="status">0</param>
+                    </url>
+                </settings>
+            </action>
+            <action name="delete">
+                <settings>
+                    <type>delete</type>
+                    <label translate="true">Delete</label>
+                    <url path="pynarae_verify/code/massDelete"/>
+                    <confirm>
+                        <title translate="true">Delete records</title>
+                        <message translate="true">Are you sure you want to delete selected records?</message>
+                    </confirm>
+                </settings>
+            </action>
+        </massaction>
         <paging name="listing_paging"/>
     </listingToolbar>
 
     <columns name="pynarae_verify_code_columns">
+        <settings>
+            <editorConfig>
+                <param name="selectProvider" xsi:type="string">pynarae_verify_code_listing.pynarae_verify_code_listing.pynarae_verify_code_columns.ids</param>
+                <param name="enabled" xsi:type="boolean">false</param>
+                <param name="indexField" xsi:type="string">entity_id</param>
+                <param name="clientConfig" xsi:type="array">
+                    <item name="saveUrl" xsi:type="url" path="mui/index/render"/>
+                    <item name="validateBeforeSave" xsi:type="boolean">false</item>
+                </param>
+            </editorConfig>
+            <childDefaults>
+                <param name="fieldAction" xsi:type="array">
+                    <item name="provider" xsi:type="string">pynarae_verify_code_listing.pynarae_verify_code_listing.pynarae_verify_code_columns.actions</item>
+                    <item name="target" xsi:type="string">applyAction</item>
+                    <item name="params" xsi:type="array">
+                        <item name="0" xsi:type="string">edit</item>
+                        <item name="1" xsi:type="string">${ $.$data.rowIndex }</item>
+                    </item>
+                </param>
+            </childDefaults>
+        </settings>
+
+        <selectionsColumn name="ids" sortOrder="5">
+            <settings>
+                <indexField>entity_id</indexField>
+            </settings>
+        </selectionsColumn>
+
         <column name="entity_id" sortOrder="10">
             <settings>
                 <filter>textRange</filter>
                 <label translate="true">ID</label>
-                <sorting>asc</sorting>
+                <sorting>desc</sorting>
             </settings>
         </column>
 
@@ -55,11 +128,58 @@
             </settings>
         </column>
 
-        <column name="product_sku" sortOrder="30">
+        <column name="status" component="Magento_Ui/js/grid/columns/select" sortOrder="30">
+            <settings>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+                <options class="Pynarae\Verify\Model\Source\Status"/>
+            </settings>
+        </column>
+
+        <column name="product_sku" sortOrder="40">
             <settings>
                 <filter>text</filter>
                 <label translate="true">Product SKU</label>
             </settings>
         </column>
+
+        <column name="batch_no" sortOrder="50">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Batch No.</label>
+            </settings>
+        </column>
+
+        <column name="scan_count" sortOrder="60">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">Scan Count</label>
+            </settings>
+        </column>
+
+        <column name="last_scanned_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="70">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Last Scanned At</label>
+            </settings>
+        </column>
+
+        <column name="updated_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="80">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Updated At</label>
+            </settings>
+        </column>
+
+        <actionsColumn name="actions" class="Pynarae\Verify\Ui\Component\Listing\Column\CodeActions" sortOrder="100">
+            <settings>
+                <indexField>entity_id</indexField>
+                <resizeEnabled>false</resizeEnabled>
+                <resizeDefaultWidth>120</resizeDefaultWidth>
+            </settings>
+        </actionsColumn>
     </columns>
 </listing>
