@@ -7,20 +7,6 @@
             <item name="deps" xsi:type="string">pynarae_verify_code_listing.pynarae_verify_code_listing_data_source</item>
         </item>
         <item name="spinner" xsi:type="string">pynarae_verify_code_columns</item>
-        <item name="buttons" xsi:type="array">
-            <item name="add" xsi:type="array">
-                <item name="name" xsi:type="string">add</item>
-                <item name="label" xsi:type="string" translate="true">Add New Code</item>
-                <item name="class" xsi:type="string">primary</item>
-                <item name="url" xsi:type="string">*/*/new</item>
-            </item>
-            <item name="generate" xsi:type="array">
-                <item name="name" xsi:type="string">generate</item>
-                <item name="label" xsi:type="string" translate="true">Batch Generate Package</item>
-                <item name="class" xsi:type="string">secondary</item>
-                <item name="url" xsi:type="string">pynarae_verify/generate/index</item>
-            </item>
-        </item>
     </argument>
 
     <dataSource name="pynarae_verify_code_listing_data_source">
@@ -50,59 +36,10 @@
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
         <filters name="listing_filters"/>
-        <massaction name="listing_massaction">
-            <argument name="data" xsi:type="array">
-                <item name="data" xsi:type="array">
-                    <item name="selectProvider" xsi:type="string">pynarae_verify_code_listing.pynarae_verify_code_listing.pynarae_verify_code_columns.ids</item>
-                    <item name="displayArea" xsi:type="string">bottom</item>
-                    <item name="component" xsi:type="string">Magento_Ui/js/grid/tree-massactions</item>
-                    <item name="indexField" xsi:type="string">entity_id</item>
-                </item>
-            </argument>
-
-            <action name="enable">
-                <settings>
-                    <type>enable</type>
-                    <label translate="true">Enable</label>
-                    <url path="pynarae_verify/code/massStatus">
-                        <param name="status">1</param>
-                    </url>
-                </settings>
-            </action>
-
-            <action name="disable">
-                <settings>
-                    <type>disable</type>
-                    <label translate="true">Disable</label>
-                    <url path="pynarae_verify/code/massStatus">
-                        <param name="status">0</param>
-                    </url>
-                </settings>
-            </action>
-
-            <action name="delete">
-                <settings>
-                    <type>delete</type>
-                    <label translate="true">Delete</label>
-                    <url path="pynarae_verify/code/massDelete"/>
-                    <confirm>
-                        <title translate="true">Delete codes</title>
-                        <message translate="true">Are you sure you want to delete the selected codes?</message>
-                    </confirm>
-                </settings>
-            </action>
-        </massaction>
         <paging name="listing_paging"/>
-        <exportButton name="export_button"/>
     </listingToolbar>
 
     <columns name="pynarae_verify_code_columns">
-        <selectionsColumn name="ids">
-            <settings>
-                <indexField>entity_id</indexField>
-            </settings>
-        </selectionsColumn>
-
         <column name="entity_id" sortOrder="10">
             <settings>
                 <filter>textRange</filter>
@@ -118,65 +55,11 @@
             </settings>
         </column>
 
-        <column name="status" sortOrder="30">
-            <settings>
-                <filter>select</filter>
-                <options class="Pynarae\Verify\Model\Source\Status"/>
-                <label translate="true">Status</label>
-            </settings>
-        </column>
-
-        <column name="product_sku" sortOrder="40">
+        <column name="product_sku" sortOrder="30">
             <settings>
                 <filter>text</filter>
                 <label translate="true">Product SKU</label>
             </settings>
         </column>
-
-        <column name="batch_no" sortOrder="50">
-            <settings>
-                <filter>text</filter>
-                <label translate="true">Batch Number</label>
-            </settings>
-        </column>
-
-        <column name="scan_count" sortOrder="60">
-            <settings>
-                <filter>textRange</filter>
-                <label translate="true">Scan Count</label>
-            </settings>
-        </column>
-
-        <column name="first_scanned_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="70">
-            <settings>
-                <filter>dateRange</filter>
-                <dataType>date</dataType>
-                <label translate="true">First Scanned At</label>
-            </settings>
-        </column>
-
-        <column name="last_scanned_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="80">
-            <settings>
-                <filter>dateRange</filter>
-                <dataType>date</dataType>
-                <label translate="true">Last Scanned At</label>
-            </settings>
-        </column>
-
-        <column name="updated_at" class="Magento\Ui\Component\Listing\Columns\Date" component="Magento_Ui/js/grid/columns/date" sortOrder="90">
-            <settings>
-                <filter>dateRange</filter>
-                <dataType>date</dataType>
-                <label translate="true">Updated At</label>
-            </settings>
-        </column>
-
-        <actionsColumn name="actions" class="Pynarae\Verify\Ui\Component\Listing\Column\CodeActions" sortOrder="100">
-            <settings>
-                <indexField>entity_id</indexField>
-                <resizeEnabled>false</resizeEnabled>
-                <resizeDefaultWidth>120</resizeDefaultWidth>
-            </settings>
-        </actionsColumn>
     </columns>
 </listing>
