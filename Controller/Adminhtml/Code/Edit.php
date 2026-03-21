@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Pynarae\Verify\Controller\Adminhtml\Code;
 
-use Magento\Backend\Model\View\Result\PageFactory;
+use Magento\Framework\View\Result\PageFactory;
 use Pynarae\Verify\Controller\Adminhtml\AbstractCode;
 
 use Magento\Framework\App\Action\HttpGetActionInterface;
