@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pynarae\Verify\Controller\Adminhtml\Log;
 
 use Magento\Backend\App\Action;
-use Magento\Backend\Model\View\Result\PageFactory;
+use Magento\Framework\View\Result\PageFactory;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\ResultInterface;
 
