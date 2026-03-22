@@ -16,23 +16,6 @@ $submittedCode = $block->getSubmittedCode();
                 <?= $block->escapeHtml(__('Verification is currently unavailable. Please try again later.')) ?>
             </div>
         <?php else: ?>
-            <form class="pynarae-verify__form" method="get" action="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
-                <label class="pynarae-verify__label" for="verify-code">
-                    <?= $block->escapeHtml(__('Verification code')) ?>
-                </label>
-                <input class="pynarae-verify__input"
-                       type="text"
-                       id="verify-code"
-                       name="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
-                       value="<?= $block->escapeHtmlAttr($submittedCode) ?>"
-                       placeholder="<?= $block->escapeHtmlAttr(__('Enter your code')) ?>"
-                       autocomplete="off"
-                       spellcheck="false" />
-                <button class="action primary pynarae-verify__button" type="submit">
-                    <span><?= $block->escapeHtml(__('Verify')) ?></span>
-                </button>
-            </form>
-
             <div class="pynarae-verify__scanner" data-role="qr-scanner" data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>">
                 <button class="action secondary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
                     <span><?= $block->escapeHtml(__('Scan QR code with camera')) ?></span>
@@ -51,8 +34,26 @@ $submittedCode = $block->getSubmittedCode();
                 </div>
             </div>
 
+            <form class="pynarae-verify__form" method="get" action="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+                <label class="pynarae-verify__label" for="verify-code">
+                    <?= $block->escapeHtml(__('Verification code')) ?>
+                </label>
+                <input class="pynarae-verify__input"
+                       type="text"
+                       id="verify-code"
+                       name="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
+                       value="<?= $block->escapeHtmlAttr($submittedCode) ?>"
+                       placeholder="<?= $block->escapeHtmlAttr(__('Enter your code')) ?>"
+                       autocomplete="off"
+                       spellcheck="false" />
+                <button class="action primary pynarae-verify__button" type="submit">
+                    <span><?= $block->escapeHtml(__('Verify')) ?></span>
+                </button>
+            </form>
+
+
             <?php if ($result): ?>
-                <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>">
+                <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>" data-role="verify-result" tabindex="-1">
                     <div class="pynarae-verify__result-title"><?= $block->escapeHtml($result['title'] ?? '') ?></div>
                     <div class="pynarae-verify__result-text"><?= $block->escapeHtml($result['message'] ?? '') ?></div>
                 </div>
@@ -136,7 +137,8 @@ $submittedCode = $block->getSubmittedCode();
                 "successDetected": "<?= $block->escapeJsQuote(__('QR code detected successfully. Preparing verification...'), '"') ?>",
                 "successSubmitting": "<?= $block->escapeJsQuote(__('Submitting verification...'), '"') ?>",
                 "keepFocus": "<?= $block->escapeJsQuote(__('Scanning... keep the camera steady and in focus.'), '"') ?>",
-                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Verification failed, please try again.'), '"') ?>"
+                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Verification failed, please try again.'), '"') ?>",
+                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Invalid QR code. Please scan an official verification QR code.'), '"') ?>"
             }
         }
     }
