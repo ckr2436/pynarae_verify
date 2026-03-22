@@ -157,11 +157,8 @@ define([], function () {
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
         if (!isMobile) {
-            scanTrigger.hidden = true;
             setMessage(messages.desktopGuide, false);
-            return;
         }
 
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
@@ -213,6 +210,18 @@ define([], function () {
                     audio: false
                 });
             } catch (e) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: false
+                    });
+                } catch (fallbackError) {
+                    setMessage(messages.cameraDenied, true);
+                    return;
+                }
+            }
+
+            if (!stream) {
                 setMessage(messages.cameraDenied, true);
                 return;
             }
