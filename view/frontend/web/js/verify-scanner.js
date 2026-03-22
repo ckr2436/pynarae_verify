@@ -170,6 +170,8 @@ define([], function () {
         var detector = null;
         var activeFallback = null;
         var fallbackLoader = null;
+        var fallbackFailureCounts = {};
+        var disabledFallbacks = {};
         var qrCanvas = null;
         var qrContext = null;
         var fallbackStatusMessageShown = false;
@@ -237,6 +239,36 @@ define([], function () {
             });
         };
 
+        var isNoCodeDetectionError = function (error) {
+            var errorMessage = ((error && error.message) || '').toLowerCase();
+            return errorMessage.indexOf('no qr') !== -1 ||
+                errorMessage.indexOf('notfound') !== -1 ||
+                errorMessage.indexOf('not found') !== -1 ||
+                errorMessage.indexOf('no code') !== -1 ||
+                errorMessage.indexOf('no barcode') !== -1;
+        };
+
+        var handleFallbackDecodeError = function (fallbackName, error) {
+            if (isNoCodeDetectionError(error)) {
+                return;
+            }
+
+            fallbackFailureCounts[fallbackName] = (fallbackFailureCounts[fallbackName] || 0) + 1;
+            if (fallbackFailureCounts[fallbackName] < 2) {
+                return;
+            }
+
+            disabledFallbacks[fallbackName] = true;
+            if (activeFallback && activeFallback.name === fallbackName) {
+                activeFallback = null;
+            }
+            fallbackLoader = null;
+        };
+
+        var isFallbackAvailable = function (fallbackName) {
+            return !disabledFallbacks[fallbackName];
+        };
+
         var loadFallbackDetector = function () {
             if (activeFallback) {
                 return Promise.resolve(activeFallback);
@@ -247,7 +279,8 @@ define([], function () {
             }
 
             fallbackLoader = (async function () {
-                if (window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
+                if (isFallbackAvailable('qr-scanner') &&
+                    window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
                     if (typeof window.QrScanner.WORKER_PATH === 'undefined') {
                         window.QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
                     }
@@ -257,6 +290,9 @@ define([], function () {
                 }
 
                 try {
+                    if (!isFallbackAvailable('qr-scanner')) {
+                        throw new Error('qr-scanner fallback disabled');
+                    }
                     await loadScript('https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js');
                     if (window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
                         window.QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
@@ -268,6 +304,9 @@ define([], function () {
                 }
 
                 try {
+                    if (!isFallbackAvailable('html5-qrcode')) {
+                        throw new Error('html5-qrcode fallback disabled');
+                    }
                     await loadScript('https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js');
                     if (window.Html5Qrcode && typeof window.Html5Qrcode.prototype.scanFile === 'function') {
                         if (!document.getElementById('pynarae-html5qrcode-offscreen')) {
@@ -287,6 +326,9 @@ define([], function () {
                 }
 
                 try {
+                    if (!isFallbackAvailable('zxing')) {
+                        throw new Error('zxing fallback disabled');
+                    }
                     await loadScript('https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js');
                     if (window.ZXing && typeof window.ZXing.BrowserQRCodeReader === 'function') {
                         activeFallback = {
@@ -356,6 +398,7 @@ define([], function () {
                     });
                     return qrScannerResult && qrScannerResult.data ? qrScannerResult.data : qrScannerResult || '';
                 } catch (e) {
+                    handleFallbackDecodeError(fallback.name, e);
                     return '';
                 }
             }
@@ -370,6 +413,7 @@ define([], function () {
                 try {
                     return await fallback.detector.scanFile(html5File, false);
                 } catch (e) {
+                    handleFallbackDecodeError(fallback.name, e);
                     return '';
                 }
             }
@@ -386,6 +430,7 @@ define([], function () {
                     var zxingResult = await fallback.detector.decodeFromImageElement(image);
                     return zxingResult && zxingResult.text ? zxingResult.text : '';
                 } catch (e) {
+                    handleFallbackDecodeError(fallback.name, e);
                     return '';
                 } finally {
                     URL.revokeObjectURL(objectUrl);
