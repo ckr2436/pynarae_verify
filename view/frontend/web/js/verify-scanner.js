@@ -13,6 +13,7 @@ define([], function () {
         var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
         var scanStop = scannerRoot.querySelector('[data-role="scan-stop"]');
+        var resultPanel = document.querySelector('[data-role="verify-result"]');
         var codeInput = document.querySelector('#verify-code');
         var form = document.querySelector('.pynarae-verify__form');
 
@@ -24,6 +25,8 @@ define([], function () {
         var scanTimer;
         var successDelayTimer;
         var isFinishingScan = false;
+        var isScannerOpen = false;
+        var scannerHistoryActive = false;
         var messages = config.messages || {};
 
         var setMessage = function (message, isError) {
@@ -31,7 +34,9 @@ define([], function () {
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
         };
 
-        var closeScanner = function () {
+        var closeScanner = function (options) {
+            var closeOptions = options || {};
+
             if (scanTimer) {
                 window.clearInterval(scanTimer);
                 scanTimer = null;
@@ -43,6 +48,7 @@ define([], function () {
             }
 
             isFinishingScan = false;
+            isScannerOpen = false;
 
             if (stream) {
                 stream.getTracks().forEach(function (track) {
@@ -54,6 +60,11 @@ define([], function () {
             scanVideo.srcObject = null;
             scanModal.hidden = true;
             document.body.classList.remove('pynarae-verify--scanner-open');
+
+            if (closeOptions.syncHistory !== false && scannerHistoryActive) {
+                scannerHistoryActive = false;
+                window.history.back();
+            }
         };
 
         var parseScannedCode = function (rawValue) {
@@ -87,13 +98,59 @@ define([], function () {
             return scannedText;
         };
 
-        var submitScannedCode = function (qrValue) {
-            var codeValue = parseScannedCode(qrValue);
+        var parseAndValidateScannedCode = function (rawValue, allowedHosts) {
+            var codeValue = parseScannedCode(rawValue);
             if (!codeValue) {
+                return {
+                    isValid: false,
+                    errorMessage: messages.scanFailedRetry
+                };
+            }
+
+            var scannedText = (rawValue || '').trim();
+            var decodedText = scannedText;
+            try {
+                decodedText = decodeURIComponent(scannedText);
+            } catch (e) {
+                // Keep original value.
+            }
+
+            if (!/^https?:\/\//i.test(decodedText)) {
+                return {
+                    isValid: true,
+                    code: codeValue
+                };
+            }
+
+            try {
+                var scannedUrl = new URL(decodedText);
+                if (allowedHosts.indexOf(scannedUrl.host) === -1) {
+                    return {
+                        isValid: false,
+                        errorMessage: messages.invalidQrDomain
+                    };
+                }
+            } catch (e) {
+                return {
+                    isValid: false,
+                    errorMessage: messages.scanFailedRetry
+                };
+            }
+
+            return {
+                isValid: true,
+                code: codeValue
+            };
+        };
+
+        var submitScannedCode = function (qrValue, allowedHosts) {
+            var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
+            if (!parsedResult.isValid) {
+                setMessage(parsedResult.errorMessage, true);
                 return;
             }
 
-            codeInput.value = codeValue;
+            codeInput.value = parsedResult.code;
             setMessage(messages.successSubmitting, false);
             form.submit();
         };
@@ -120,6 +177,30 @@ define([], function () {
         }
 
         var detector = new window.BarcodeDetector({formats: ['qr_code']});
+        var allowedHosts = [window.location.host];
+
+        try {
+            var resolvedFormAction = new URL(form.getAttribute('action'), window.location.origin);
+            if (allowedHosts.indexOf(resolvedFormAction.host) === -1) {
+                allowedHosts.push(resolvedFormAction.host);
+            }
+        } catch (e) {
+            // Ignore URL parsing failures and fall back to current host only.
+        }
+
+        var scrollToResultIfPresent = function () {
+            var url = new URL(window.location.href);
+            if (!url.searchParams.get(codeParamName) || !resultPanel) {
+                return;
+            }
+
+            resultPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
+            if (typeof resultPanel.focus === 'function') {
+                resultPanel.focus({preventScroll: true});
+            }
+        };
+
+        scrollToResultIfPresent();
 
         scanTrigger.addEventListener('click', async function () {
             closeScanner();
@@ -139,7 +220,10 @@ define([], function () {
             isFinishingScan = false;
             scanVideo.srcObject = stream;
             scanModal.hidden = false;
+            isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
+            window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+            scannerHistoryActive = true;
             setMessage(messages.scanning, false);
 
             try {
@@ -175,7 +259,7 @@ define([], function () {
                     setMessage(messages.successDetected, false);
                     successDelayTimer = window.setTimeout(function () {
                         closeScanner();
-                        submitScannedCode(qrValue);
+                        submitScannedCode(qrValue, allowedHosts);
                     }, 650);
                 } catch (e) {
                     setMessage(messages.keepFocus, false);
@@ -184,10 +268,22 @@ define([], function () {
         });
 
         scanStop.addEventListener('click', function () {
-            closeScanner();
+            closeScanner({syncHistory: true});
             setMessage(messages.scanFailedRetry, true);
         });
 
-        window.addEventListener('beforeunload', closeScanner);
+        window.addEventListener('popstate', function () {
+            if (!isScannerOpen) {
+                return;
+            }
+
+            scannerHistoryActive = false;
+            closeScanner({syncHistory: false});
+            setMessage(messages.scanFailedRetry, true);
+        });
+
+        window.addEventListener('beforeunload', function () {
+            closeScanner({syncHistory: false});
+        });
     };
 });
