@@ -215,6 +215,28 @@ define([], function () {
             });
         };
 
+        var loadImageFromObjectUrl = function (objectUrl) {
+            return new Promise(function (resolve, reject) {
+                var image = new Image();
+                image.onload = function () {
+                    if (typeof image.decode === 'function') {
+                        image.decode().then(function () {
+                            resolve(image);
+                        }).catch(function () {
+                            resolve(image);
+                        });
+                        return;
+                    }
+
+                    resolve(image);
+                };
+                image.onerror = function () {
+                    reject(new Error('Failed to decode frame image'));
+                };
+                image.src = objectUrl;
+            });
+        };
+
         var loadFallbackDetector = function () {
             if (activeFallback) {
                 return Promise.resolve(activeFallback);
@@ -359,10 +381,8 @@ define([], function () {
                 }
 
                 var objectUrl = URL.createObjectURL(zxingBlob);
-                var image = new Image();
-                image.src = objectUrl;
-                await image.decode();
                 try {
+                    var image = await loadImageFromObjectUrl(objectUrl);
                     var zxingResult = await fallback.detector.decodeFromImageElement(image);
                     return zxingResult && zxingResult.text ? zxingResult.text : '';
                 } catch (e) {
