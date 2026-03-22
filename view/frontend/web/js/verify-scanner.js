@@ -167,13 +167,52 @@ define([], function () {
             return;
         }
 
-        if (typeof window.BarcodeDetector !== 'function') {
-            scanTrigger.hidden = true;
-            setMessage(messages.noBarcodeDetector, true);
-            return;
-        }
+        var detector = null;
+        var jsQrDecode = null;
+        var jsQrLoader = null;
+        var qrCanvas = null;
+        var qrContext = null;
 
-        var detector = new window.BarcodeDetector({formats: ['qr_code']});
+        var loadJsQrDecoder = function () {
+            if (jsQrDecode) {
+                return Promise.resolve(jsQrDecode);
+            }
+
+            if (window.jsQR && typeof window.jsQR === 'function') {
+                jsQrDecode = window.jsQR;
+                return Promise.resolve(jsQrDecode);
+            }
+
+            if (jsQrLoader) {
+                return jsQrLoader;
+            }
+
+            jsQrLoader = new Promise(function (resolve, reject) {
+                var script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                script.async = true;
+                script.onload = function () {
+                    if (window.jsQR && typeof window.jsQR === 'function') {
+                        jsQrDecode = window.jsQR;
+                        resolve(jsQrDecode);
+                        return;
+                    }
+
+                    reject(new Error('jsQR loaded without window.jsQR'));
+                };
+                script.onerror = function () {
+                    reject(new Error('Failed to load jsQR'));
+                };
+
+                document.head.appendChild(script);
+            });
+
+            return jsQrLoader;
+        };
+
+        if (typeof window.BarcodeDetector === 'function') {
+            detector = new window.BarcodeDetector({formats: ['qr_code']});
+        }
         var allowedHosts = [window.location.host];
 
         try {
@@ -199,8 +238,55 @@ define([], function () {
 
         scrollToResultIfPresent();
 
+        var detectQrCode = async function () {
+            if (detector) {
+                var nativeCodes = await detector.detect(scanVideo);
+                if (nativeCodes.length && nativeCodes[0].rawValue) {
+                    return nativeCodes[0].rawValue;
+                }
+
+                return '';
+            }
+
+            if (!jsQrDecode) {
+                await loadJsQrDecoder();
+            }
+
+            if (!qrCanvas) {
+                qrCanvas = document.createElement('canvas');
+                qrContext = qrCanvas.getContext('2d', {willReadFrequently: true});
+            }
+
+            var width = scanVideo.videoWidth;
+            var height = scanVideo.videoHeight;
+            if (!width || !height || !qrContext) {
+                return '';
+            }
+
+            qrCanvas.width = width;
+            qrCanvas.height = height;
+            qrContext.drawImage(scanVideo, 0, 0, width, height);
+
+            var frame = qrContext.getImageData(0, 0, width, height);
+            var decoded = jsQrDecode(frame.data, width, height, {
+                inversionAttempts: 'dontInvert'
+            });
+
+            return decoded && decoded.data ? decoded.data : '';
+        };
+
         scanTrigger.addEventListener('click', async function () {
             closeScanner();
+
+            if (!detector) {
+                setMessage(messages.loadingFallback, false);
+                try {
+                    await loadJsQrDecoder();
+                } catch (decoderError) {
+                    setMessage(messages.noBarcodeDetector, true);
+                    return;
+                }
+            }
 
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
@@ -249,12 +335,7 @@ define([], function () {
                 }
 
                 try {
-                    var codes = await detector.detect(scanVideo);
-                    if (!codes.length) {
-                        return;
-                    }
-
-                    var qrValue = (codes[0].rawValue || '').trim();
+                    var qrValue = (await detectQrCode() || '').trim();
                     if (!qrValue) {
                         return;
                     }

@@ -130,6 +130,7 @@ $submittedCode = $block->getSubmittedCode();
             "messages": {
                 "desktopGuide": "<?= $block->escapeJsQuote(__('Please use your phone to scan: scan the product QR code with your phone camera, then open the verification page.'), '"') ?>",
                 "noCameraApi": "<?= $block->escapeJsQuote(__('This browser cannot access the camera. Please enter the anti-counterfeit code manually.'), '"') ?>",
+                "loadingFallback": "<?= $block->escapeJsQuote(__('Preparing QR scanner compatibility mode for this browser...'), '"') ?>",
                 "noBarcodeDetector": "<?= $block->escapeJsQuote(__('This browser does not support native QR recognition. Please upgrade your browser or enter the anti-counterfeit code manually.'), '"') ?>",
                 "cameraDenied": "<?= $block->escapeJsQuote(__('Camera permission was denied or unavailable. Please enter the anti-counterfeit code manually.'), '"') ?>",
                 "scanning": "<?= $block->escapeJsQuote(__('Align the QR code within the camera frame. The scanner will close automatically after a successful scan.'), '"') ?>",
