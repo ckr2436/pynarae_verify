@@ -240,12 +240,32 @@ define([], function () {
         };
 
         var isNoCodeDetectionError = function (error) {
-            var errorMessage = ((error && error.message) || '').toLowerCase();
-            return errorMessage.indexOf('no qr') !== -1 ||
-                errorMessage.indexOf('notfound') !== -1 ||
-                errorMessage.indexOf('not found') !== -1 ||
-                errorMessage.indexOf('no code') !== -1 ||
-                errorMessage.indexOf('no barcode') !== -1;
+            var details = [];
+            var addDetail = function (value) {
+                if (typeof value === 'string' && value) {
+                    details.push(value.toLowerCase());
+                }
+            };
+
+            addDetail(error);
+            if (error && typeof error === 'object') {
+                addDetail(error.message);
+                addDetail(error.name);
+                addDetail(error.code);
+                if (error.constructor && typeof error.constructor.name === 'string') {
+                    addDetail(error.constructor.name);
+                }
+            }
+
+            return details.some(function (detail) {
+                return detail.indexOf('no qr') !== -1 ||
+                    detail.indexOf('notfound') !== -1 ||
+                    detail.indexOf('not found') !== -1 ||
+                    detail.indexOf('no code') !== -1 ||
+                    detail.indexOf('no barcode') !== -1 ||
+                    detail.indexOf('qr_parse_error') !== -1 ||
+                    detail.indexOf('notfoundexception') !== -1;
+            });
         };
 
         var handleFallbackDecodeError = function (fallbackName, error) {
