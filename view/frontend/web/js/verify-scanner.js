@@ -424,13 +424,13 @@ define([], function () {
             }
 
             if (fallback.name === 'html5-qrcode' && fallback.detector) {
-                var html5Blob = await toBlob(frameCanvas);
-                if (!html5Blob) {
-                    return '';
-                }
-
-                var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
                 try {
+                    var html5Blob = await toBlob(frameCanvas);
+                    if (!html5Blob) {
+                        throw new Error('Failed to convert frame to blob');
+                    }
+
+                    var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
                     return await fallback.detector.scanFile(html5File, false);
                 } catch (e) {
                     handleFallbackDecodeError(fallback.name, e);
