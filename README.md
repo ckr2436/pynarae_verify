@@ -5,7 +5,7 @@ Production-ready Magento 2 authenticity verification module for `pynarae.com`.
 ## Features
 
 - Frontend verification page at `/verify`
-- Mobile camera QR scan on `/verify` when browser supports `getUserMedia` + `BarcodeDetector` (desktop shows mobile-scan guidance)
+- Mobile camera QR scan on `/verify` with capability routing: native `BarcodeDetector` when available, fallback scanners (`qr-scanner` / `html5-qrcode` / `zxing`) when not
 - QR-friendly verification URLs, for example:
   - `https://pynarae.com/verify?code=PYN-ABCD1234EFGH`
 - Verification code master table
