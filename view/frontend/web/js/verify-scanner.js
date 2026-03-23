@@ -689,7 +689,7 @@ define(['require'], function (require) {
                             return;
                         }
 
-                        closeScanner({syncHistory: false, invalidateSession: true});
+                        closeScanner({syncHistory: true, invalidateSession: true});
                         submitScannedCode(qrValue, allowedHosts);
                     }, 650);
 
@@ -798,7 +798,7 @@ define(['require'], function (require) {
                     return;
                 }
 
-                closeScanner({syncHistory: false, invalidateSession: true});
+                closeScanner({syncHistory: true, invalidateSession: true});
                 setMessage(messages.previewFailed, true);
                 return;
             }
