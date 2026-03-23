@@ -25,6 +25,7 @@ define(['require'], function (require) {
         var scanTimer;
         var successDelayTimer;
         var isFinishingScan = false;
+        var isDetectingFrame = false;
         var isScannerOpen = false;
         var scannerHistoryActive = false;
         var messages = config.messages || {};
@@ -48,6 +49,7 @@ define(['require'], function (require) {
             }
 
             isFinishingScan = false;
+            isDetectingFrame = false;
             isScannerOpen = false;
 
             if (stream) {
@@ -277,20 +279,18 @@ define(['require'], function (require) {
         };
 
         var handleFallbackDecodeError = function (fallbackName, error) {
+            fallbackFailureCounts[fallbackName] = (fallbackFailureCounts[fallbackName] || 0) + 1;
+
             if (isNoCodeDetectionError(error)) {
                 return;
             }
 
-            fallbackFailureCounts[fallbackName] = (fallbackFailureCounts[fallbackName] || 0) + 1;
-            if (fallbackFailureCounts[fallbackName] < 2) {
-                return;
+            if (window.console && typeof window.console.warn === 'function') {
+                window.console.warn(
+                    '[Pynarae_Verify] Frame decode failed for fallback "' + fallbackName + '"',
+                    error
+                );
             }
-
-            disabledFallbacks[fallbackName] = true;
-            if (activeFallback && activeFallback.name === fallbackName) {
-                activeFallback = null;
-            }
-            fallbackLoader = null;
         };
 
         var isFallbackAvailable = function (fallbackName) {
@@ -468,6 +468,43 @@ define(['require'], function (require) {
             return '';
         };
 
+        var waitForVideoReady = function (timeoutMs) {
+            return new Promise(function (resolve, reject) {
+                var timeout = timeoutMs || 5000;
+                var startedAt = Date.now();
+
+                var cleanup = function () {
+                    scanVideo.removeEventListener('loadedmetadata', checkReadyState);
+                    scanVideo.removeEventListener('loadeddata', checkReadyState);
+                    scanVideo.removeEventListener('canplay', checkReadyState);
+                };
+
+                var checkReadyState = function () {
+                    if (!stream) {
+                        cleanup();
+                        reject(new Error('Camera stream stopped before video became ready'));
+                        return;
+                    }
+
+                    if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
+                        cleanup();
+                        resolve();
+                        return;
+                    }
+
+                    if (Date.now() - startedAt >= timeout) {
+                        cleanup();
+                        reject(new Error('Timed out while waiting for camera preview readiness'));
+                    }
+                };
+
+                scanVideo.addEventListener('loadedmetadata', checkReadyState);
+                scanVideo.addEventListener('loadeddata', checkReadyState);
+                scanVideo.addEventListener('canplay', checkReadyState);
+                checkReadyState();
+            });
+        };
+
         scanTrigger.addEventListener('click', async function () {
             closeScanner();
 
@@ -519,6 +556,7 @@ define(['require'], function (require) {
 
             try {
                 await scanVideo.play();
+                await waitForVideoReady(5000);
             } catch (e) {
                 closeScanner();
                 setMessage(messages.previewFailed, true);
@@ -526,10 +564,11 @@ define(['require'], function (require) {
             }
 
             scanTimer = window.setInterval(async function () {
-                if (!stream || isFinishingScan) {
+                if (!stream || isFinishingScan || isDetectingFrame) {
                     return;
                 }
 
+                isDetectingFrame = true;
                 try {
                     var qrValue = (await detectQrCode() || '').trim();
                     if (!qrValue) {
@@ -549,6 +588,8 @@ define(['require'], function (require) {
                     }, 650);
                 } catch (e) {
                     setMessage(messages.keepFocus, false);
+                } finally {
+                    isDetectingFrame = false;
                 }
             }, 500);
         });
