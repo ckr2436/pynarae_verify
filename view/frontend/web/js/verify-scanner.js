@@ -508,6 +508,10 @@ define(['require'], function (require) {
                     try {
                         return await item.load();
                     } catch (e) {
+                        if (sessionDisabledFallbacks[item.name] === true) {
+                            continue;
+                        }
+
                         markDetectorLoadFailure(item.name);
                     }
                 }
