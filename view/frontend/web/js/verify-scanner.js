@@ -46,8 +46,6 @@ define(['require'], function (require) {
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         var preferHtml5QrcodeFallback = isAppleMobileDevice;
-        var nativeDetectorEmptyReads = 0;
-        var nativeDetectorEmptyReadLimit = 4;
 
         var assetUrls = {
             qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
@@ -592,16 +590,10 @@ define(['require'], function (require) {
                     var nativeCodes = await detector.detect(scanVideo);
 
                     if (nativeCodes.length && nativeCodes[0].rawValue) {
-                        nativeDetectorEmptyReads = 0;
                         return nativeCodes[0].rawValue;
                     }
 
-                    nativeDetectorEmptyReads += 1;
-                    if (nativeDetectorEmptyReads >= nativeDetectorEmptyReadLimit) {
-                        detector = null;
-                    } else {
-                        return '';
-                    }
+                    return '';
                 } catch (nativeError) {
                     detector = null;
                 }
