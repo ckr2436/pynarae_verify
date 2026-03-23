@@ -43,6 +43,11 @@ define(['require'], function (require) {
             'html5-qrcode': false,
             'zxing': false
         };
+        var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var preferHtml5QrcodeFallback = isAppleMobileDevice;
+        var nativeDetectorEmptyReads = 0;
+        var nativeDetectorEmptyReadLimit = 4;
 
         var assetUrls = {
             qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
@@ -442,22 +447,24 @@ define(['require'], function (require) {
             }
 
             fallbackLoader = (async function () {
-                try {
-                    return await ensureQrScannerLoaded();
-                } catch (e1) {
-                    markDetectorLoadFailure('qr-scanner');
-                }
+                var orderedFallbacks = preferHtml5QrcodeFallback ? [
+                    {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded},
+                    {name: 'zxing', load: ensureZxingLoaded},
+                    {name: 'qr-scanner', load: ensureQrScannerLoaded}
+                ] : [
+                    {name: 'qr-scanner', load: ensureQrScannerLoaded},
+                    {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded},
+                    {name: 'zxing', load: ensureZxingLoaded}
+                ];
 
-                try {
-                    return await ensureHtml5QrcodeLoaded();
-                } catch (e2) {
-                    markDetectorLoadFailure('html5-qrcode');
-                }
+                for (var i = 0; i < orderedFallbacks.length; i++) {
+                    var item = orderedFallbacks[i];
 
-                try {
-                    return await ensureZxingLoaded();
-                } catch (e3) {
-                    markDetectorLoadFailure('zxing');
+                    try {
+                        return await item.load();
+                    } catch (e) {
+                        markDetectorLoadFailure(item.name);
+                    }
                 }
 
                 throw new Error('No fallback QR library available');
@@ -466,7 +473,7 @@ define(['require'], function (require) {
             return fallbackLoader;
         };
 
-        if (typeof window.BarcodeDetector === 'function') {
+        if (!isAppleMobileDevice && typeof window.BarcodeDetector === 'function') {
             try {
                 detector = new window.BarcodeDetector({formats: ['qr_code']});
             } catch (e) {
@@ -583,10 +590,18 @@ define(['require'], function (require) {
             if (detector) {
                 try {
                     var nativeCodes = await detector.detect(scanVideo);
+
                     if (nativeCodes.length && nativeCodes[0].rawValue) {
+                        nativeDetectorEmptyReads = 0;
                         return nativeCodes[0].rawValue;
                     }
-                    return '';
+
+                    nativeDetectorEmptyReads += 1;
+                    if (nativeDetectorEmptyReads >= nativeDetectorEmptyReadLimit) {
+                        detector = null;
+                    } else {
+                        return '';
+                    }
                 } catch (nativeError) {
                     detector = null;
                 }
