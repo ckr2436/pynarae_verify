@@ -45,7 +45,18 @@ define(['require'], function (require) {
         };
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        var preferHtml5QrcodeFallback = isAppleMobileDevice;
+        var preferHtml5QrcodeFallback = false;
+        var sessionFallbackFailures = {
+            'qr-scanner': 0,
+            'html5-qrcode': 0,
+            'zxing': 0
+        };
+        var sessionDisabledFallbacks = {
+            'qr-scanner': false,
+            'html5-qrcode': false,
+            'zxing': false
+        };
+        var runtimeFallbackFailureLimit = 2;
 
         var assetUrls = {
             qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
@@ -361,7 +372,40 @@ define(['require'], function (require) {
         };
 
         var isFallbackAvailable = function (name) {
-            return detectorLoadFailures[name] !== true;
+            return detectorLoadFailures[name] !== true &&
+                sessionDisabledFallbacks[name] !== true;
+        };
+
+        var resetFallbackSessionState = function () {
+            sessionFallbackFailures['qr-scanner'] = 0;
+            sessionFallbackFailures['html5-qrcode'] = 0;
+            sessionFallbackFailures['zxing'] = 0;
+
+            sessionDisabledFallbacks['qr-scanner'] = false;
+            sessionDisabledFallbacks['html5-qrcode'] = false;
+            sessionDisabledFallbacks['zxing'] = false;
+
+            activeFallback = null;
+            fallbackLoader = null;
+        };
+
+        var rotateFallbackOnRuntimeError = function (name, error) {
+            if (isNoCodeDetectionError(error)) {
+                return;
+            }
+
+            sessionFallbackFailures[name] = (sessionFallbackFailures[name] || 0) + 1;
+            if (sessionFallbackFailures[name] < runtimeFallbackFailureLimit) {
+                return;
+            }
+
+            sessionDisabledFallbacks[name] = true;
+
+            if (activeFallback && activeFallback.name === name) {
+                activeFallback = null;
+            }
+
+            fallbackLoader = null;
         };
 
         var ensureQrScannerLoaded = async function () {
@@ -445,10 +489,10 @@ define(['require'], function (require) {
             }
 
             fallbackLoader = (async function () {
-                var orderedFallbacks = preferHtml5QrcodeFallback ? [
-                    {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded},
+                var orderedFallbacks = (isAppleMobileDevice && !preferHtml5QrcodeFallback) ? [
+                    {name: 'qr-scanner', load: ensureQrScannerLoaded},
                     {name: 'zxing', load: ensureZxingLoaded},
-                    {name: 'qr-scanner', load: ensureQrScannerLoaded}
+                    {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded}
                 ] : [
                     {name: 'qr-scanner', load: ensureQrScannerLoaded},
                     {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded},
@@ -614,6 +658,7 @@ define(['require'], function (require) {
 
                     return qrScannerResult && qrScannerResult.data ? qrScannerResult.data : (qrScannerResult || '');
                 } catch (e) {
+                    rotateFallbackOnRuntimeError('qr-scanner', e);
                     return '';
                 }
             }
@@ -628,6 +673,7 @@ define(['require'], function (require) {
                     var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
                     return await fallback.detector.scanFile(html5File, false);
                 } catch (e) {
+                    rotateFallbackOnRuntimeError('html5-qrcode', e);
                     return '';
                 }
             }
@@ -650,6 +696,7 @@ define(['require'], function (require) {
                         URL.revokeObjectURL(objectUrl);
                     }
                 } catch (e) {
+                    rotateFallbackOnRuntimeError('zxing', e);
                     return '';
                 }
             }
@@ -719,6 +766,7 @@ define(['require'], function (require) {
 
         scanTrigger.addEventListener('click', async function () {
             closeScanner({syncHistory: false, invalidateSession: true});
+            resetFallbackSessionState();
             var sessionId = openSessionId;
             var sessionStream = null;
 
