@@ -372,8 +372,7 @@ define(['require'], function (require) {
         };
 
         var isFallbackAvailable = function (name) {
-            return detectorLoadFailures[name] !== true &&
-                sessionDisabledFallbacks[name] !== true;
+            return detectorLoadFailures[name] !== true;
         };
 
         var resetFallbackSessionState = function () {
@@ -501,6 +500,10 @@ define(['require'], function (require) {
 
                 for (var i = 0; i < orderedFallbacks.length; i++) {
                     var item = orderedFallbacks[i];
+
+                    if (sessionDisabledFallbacks[item.name] === true) {
+                        continue;
+                    }
 
                     try {
                         return await item.load();
