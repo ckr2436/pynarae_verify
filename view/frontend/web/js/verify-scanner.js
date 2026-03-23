@@ -21,42 +21,76 @@ define(['require'], function (require) {
             return;
         }
 
-        var stream;
-        var scanTimer;
-        var successDelayTimer;
+        var stream = null;
+        var scanLoopTimer = null;
+        var successDelayTimer = null;
         var isFinishingScan = false;
-        var isDetectingFrame = false;
         var isScannerOpen = false;
         var scannerHistoryActive = false;
+        var isDetectingFrame = false;
         var messages = config.messages || {};
+
+        var detector = null;
+        var activeFallback = null;
+        var fallbackLoader = null;
+        var qrCanvas = null;
+        var qrContext = null;
+        var fallbackStatusMessageShown = false;
+        var scriptLoadPromises = {};
+        var detectorLoadFailures = {
+            'qr-scanner': false,
+            'html5-qrcode': false,
+            'zxing': false
+        };
+
+        var assetUrls = {
+            qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
+            qrScannerWorker: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner-worker.min.js'),
+            html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
+            zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
+        };
 
         var setMessage = function (message, isError) {
             scanMessage.textContent = message || '';
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
         };
 
-        var closeScanner = function (options) {
-            var closeOptions = options || {};
-
-            if (scanTimer) {
-                window.clearInterval(scanTimer);
-                scanTimer = null;
+        var clearTimers = function () {
+            if (scanLoopTimer) {
+                window.clearTimeout(scanLoopTimer);
+                scanLoopTimer = null;
             }
 
             if (successDelayTimer) {
                 window.clearTimeout(successDelayTimer);
                 successDelayTimer = null;
             }
+        };
+
+        var closeScanner = function (options) {
+            var closeOptions = options || {};
+
+            clearTimers();
 
             isFinishingScan = false;
-            isDetectingFrame = false;
             isScannerOpen = false;
+            isDetectingFrame = false;
 
             if (stream) {
-                stream.getTracks().forEach(function (track) {
-                    track.stop();
-                });
+                try {
+                    stream.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+                } catch (e) {
+                    // Ignore stop errors.
+                }
                 stream = null;
+            }
+
+            try {
+                scanVideo.pause();
+            } catch (e) {
+                // Ignore pause errors.
             }
 
             scanVideo.srcObject = null;
@@ -70,7 +104,7 @@ define(['require'], function (require) {
         };
 
         var parseScannedCode = function (rawValue) {
-            var scannedText = rawValue.trim();
+            var scannedText = (rawValue || '').trim();
 
             try {
                 scannedText = decodeURIComponent(scannedText);
@@ -111,6 +145,7 @@ define(['require'], function (require) {
 
             var scannedText = (rawValue || '').trim();
             var decodedText = scannedText;
+
             try {
                 decodedText = decodeURIComponent(scannedText);
             } catch (e) {
@@ -159,6 +194,7 @@ define(['require'], function (require) {
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
         if (!isMobile) {
             setMessage(messages.desktopGuide, false);
         }
@@ -169,29 +205,36 @@ define(['require'], function (require) {
             return;
         }
 
-        var detector = null;
-        var activeFallback = null;
-        var fallbackLoader = null;
-        var fallbackFailureCounts = {};
-        var disabledFallbacks = {};
-        var qrCanvas = null;
-        var qrContext = null;
-        var fallbackStatusMessageShown = false;
-
-
-        var assetUrls = {
-            qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
-            qrScannerWorker: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner-worker.min.js'),
-            html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
-            zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
-        };
-
         var loadScript = function (src) {
-            return new Promise(function (resolve, reject) {
+            if (scriptLoadPromises[src]) {
+                return scriptLoadPromises[src];
+            }
+
+            scriptLoadPromises[src] = new Promise(function (resolve, reject) {
+                var existing = document.querySelector('script[src="' + src + '"]');
+                if (existing) {
+                    if (existing.getAttribute('data-loaded') === '1') {
+                        resolve();
+                        return;
+                    }
+
+                    existing.addEventListener('load', function () {
+                        existing.setAttribute('data-loaded', '1');
+                        resolve();
+                    }, {once: true});
+
+                    existing.addEventListener('error', function () {
+                        reject(new Error('Failed to load script: ' + src));
+                    }, {once: true});
+
+                    return;
+                }
+
                 var script = document.createElement('script');
                 script.src = src;
                 script.async = true;
                 script.onload = function () {
+                    script.setAttribute('data-loaded', '1');
                     resolve();
                 };
                 script.onerror = function () {
@@ -199,6 +242,8 @@ define(['require'], function (require) {
                 };
                 document.head.appendChild(script);
             });
+
+            return scriptLoadPromises[src];
         };
 
         var createFrameCanvas = function () {
@@ -209,6 +254,7 @@ define(['require'], function (require) {
 
             var width = scanVideo.videoWidth;
             var height = scanVideo.videoHeight;
+
             if (!width || !height || !qrContext) {
                 return null;
             }
@@ -216,6 +262,7 @@ define(['require'], function (require) {
             qrCanvas.width = width;
             qrCanvas.height = height;
             qrContext.drawImage(scanVideo, 0, 0, width, height);
+
             return qrCanvas;
         };
 
@@ -230,6 +277,7 @@ define(['require'], function (require) {
         var loadImageFromObjectUrl = function (objectUrl) {
             return new Promise(function (resolve, reject) {
                 var image = new Image();
+
                 image.onload = function () {
                     if (typeof image.decode === 'function') {
                         image.decode().then(function () {
@@ -242,15 +290,18 @@ define(['require'], function (require) {
 
                     resolve(image);
                 };
+
                 image.onerror = function () {
                     reject(new Error('Failed to decode frame image'));
                 };
+
                 image.src = objectUrl;
             });
         };
 
         var isNoCodeDetectionError = function (error) {
             var details = [];
+
             var addDetail = function (value) {
                 if (typeof value === 'string' && value) {
                     details.push(value.toLowerCase());
@@ -258,6 +309,7 @@ define(['require'], function (require) {
             };
 
             addDetail(error);
+
             if (error && typeof error === 'object') {
                 addDetail(error.message);
                 addDetail(error.name);
@@ -278,23 +330,89 @@ define(['require'], function (require) {
             });
         };
 
-        var handleFallbackDecodeError = function (fallbackName, error) {
-            fallbackFailureCounts[fallbackName] = (fallbackFailureCounts[fallbackName] || 0) + 1;
+        var markDetectorLoadFailure = function (name) {
+            detectorLoadFailures[name] = true;
 
-            if (isNoCodeDetectionError(error)) {
-                return;
+            if (activeFallback && activeFallback.name === name) {
+                activeFallback = null;
             }
 
-            if (window.console && typeof window.console.warn === 'function') {
-                window.console.warn(
-                    '[Pynarae_Verify] Frame decode failed for fallback "' + fallbackName + '"',
-                    error
-                );
-            }
+            fallbackLoader = null;
         };
 
-        var isFallbackAvailable = function (fallbackName) {
-            return !disabledFallbacks[fallbackName];
+        var isFallbackAvailable = function (name) {
+            return detectorLoadFailures[name] !== true;
+        };
+
+        var ensureQrScannerLoaded = async function () {
+            if (!isFallbackAvailable('qr-scanner')) {
+                throw new Error('qr-scanner disabled because of prior load/init failure');
+            }
+
+            if (!window.QrScanner || typeof window.QrScanner.scanImage !== 'function') {
+                await loadScript(assetUrls.qrScanner);
+            }
+
+            if (!window.QrScanner || typeof window.QrScanner.scanImage !== 'function') {
+                throw new Error('QrScanner did not initialize correctly');
+            }
+
+            window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
+
+            activeFallback = {
+                name: 'qr-scanner'
+            };
+
+            return activeFallback;
+        };
+
+        var ensureHtml5QrcodeLoaded = async function () {
+            if (!isFallbackAvailable('html5-qrcode')) {
+                throw new Error('html5-qrcode disabled because of prior load/init failure');
+            }
+
+            if (!window.Html5Qrcode || typeof window.Html5Qrcode.prototype.scanFile !== 'function') {
+                await loadScript(assetUrls.html5Qrcode);
+            }
+
+            if (!window.Html5Qrcode || typeof window.Html5Qrcode.prototype.scanFile !== 'function') {
+                throw new Error('Html5Qrcode did not initialize correctly');
+            }
+
+            if (!document.getElementById('pynarae-html5qrcode-offscreen')) {
+                var html5Root = document.createElement('div');
+                html5Root.id = 'pynarae-html5qrcode-offscreen';
+                html5Root.hidden = true;
+                document.body.appendChild(html5Root);
+            }
+
+            activeFallback = {
+                name: 'html5-qrcode',
+                detector: new window.Html5Qrcode('pynarae-html5qrcode-offscreen')
+            };
+
+            return activeFallback;
+        };
+
+        var ensureZxingLoaded = async function () {
+            if (!isFallbackAvailable('zxing')) {
+                throw new Error('zxing disabled because of prior load/init failure');
+            }
+
+            if (!window.ZXing || typeof window.ZXing.BrowserQRCodeReader !== 'function') {
+                await loadScript(assetUrls.zxing);
+            }
+
+            if (!window.ZXing || typeof window.ZXing.BrowserQRCodeReader !== 'function') {
+                throw new Error('ZXing did not initialize correctly');
+            }
+
+            activeFallback = {
+                name: 'zxing',
+                detector: new window.ZXing.BrowserQRCodeReader()
+            };
+
+            return activeFallback;
         };
 
         var loadFallbackDetector = function () {
@@ -307,66 +425,22 @@ define(['require'], function (require) {
             }
 
             fallbackLoader = (async function () {
-                if (isFallbackAvailable('qr-scanner') &&
-                    window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
-                    if (typeof window.QrScanner.WORKER_PATH === 'undefined') {
-                        window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
-                    }
-
-                    activeFallback = {name: 'qr-scanner'};
-                    return activeFallback;
+                try {
+                    return await ensureQrScannerLoaded();
+                } catch (e1) {
+                    markDetectorLoadFailure('qr-scanner');
                 }
 
                 try {
-                    if (!isFallbackAvailable('qr-scanner')) {
-                        throw new Error('qr-scanner fallback disabled');
-                    }
-                    await loadScript(assetUrls.qrScanner);
-                    if (window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
-                        window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
-                        activeFallback = {name: 'qr-scanner'};
-                        return activeFallback;
-                    }
-                } catch (e) {
-                    // Try next fallback.
+                    return await ensureHtml5QrcodeLoaded();
+                } catch (e2) {
+                    markDetectorLoadFailure('html5-qrcode');
                 }
 
                 try {
-                    if (!isFallbackAvailable('html5-qrcode')) {
-                        throw new Error('html5-qrcode fallback disabled');
-                    }
-                    await loadScript(assetUrls.html5Qrcode);
-                    if (window.Html5Qrcode && typeof window.Html5Qrcode.prototype.scanFile === 'function') {
-                        if (!document.getElementById('pynarae-html5qrcode-offscreen')) {
-                            var html5Root = document.createElement('div');
-                            html5Root.id = 'pynarae-html5qrcode-offscreen';
-                            html5Root.hidden = true;
-                            document.body.appendChild(html5Root);
-                        }
-                        activeFallback = {
-                            name: 'html5-qrcode',
-                            detector: new window.Html5Qrcode('pynarae-html5qrcode-offscreen')
-                        };
-                        return activeFallback;
-                    }
-                } catch (e) {
-                    // Try next fallback.
-                }
-
-                try {
-                    if (!isFallbackAvailable('zxing')) {
-                        throw new Error('zxing fallback disabled');
-                    }
-                    await loadScript(assetUrls.zxing);
-                    if (window.ZXing && typeof window.ZXing.BrowserQRCodeReader === 'function') {
-                        activeFallback = {
-                            name: 'zxing',
-                            detector: new window.ZXing.BrowserQRCodeReader()
-                        };
-                        return activeFallback;
-                    }
-                } catch (e) {
-                    // Give up.
+                    return await ensureZxingLoaded();
+                } catch (e3) {
+                    markDetectorLoadFailure('zxing');
                 }
 
                 throw new Error('No fallback QR library available');
@@ -376,8 +450,13 @@ define(['require'], function (require) {
         };
 
         if (typeof window.BarcodeDetector === 'function') {
-            detector = new window.BarcodeDetector({formats: ['qr_code']});
+            try {
+                detector = new window.BarcodeDetector({formats: ['qr_code']});
+            } catch (e) {
+                detector = null;
+            }
         }
+
         var allowedHosts = [window.location.host];
 
         try {
@@ -391,11 +470,13 @@ define(['require'], function (require) {
 
         var scrollToResultIfPresent = function () {
             var url = new URL(window.location.href);
+
             if (!url.searchParams.get(codeParamName) || !resultPanel) {
                 return;
             }
 
             resultPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
+
             if (typeof resultPanel.focus === 'function') {
                 resultPanel.focus({preventScroll: true});
             }
@@ -403,18 +484,71 @@ define(['require'], function (require) {
 
         scrollToResultIfPresent();
 
+        var waitForVideoReady = function (timeoutMs) {
+            var maxWait = typeof timeoutMs === 'number' ? timeoutMs : 4000;
+
+            return new Promise(function (resolve, reject) {
+                var start = Date.now();
+
+                var cleanup = function () {
+                    scanVideo.removeEventListener('loadedmetadata', onReadyCheck);
+                    scanVideo.removeEventListener('loadeddata', onReadyCheck);
+                    scanVideo.removeEventListener('canplay', onReadyCheck);
+                };
+
+                var onReadyCheck = function () {
+                    if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
+                        cleanup();
+                        resolve();
+                        return;
+                    }
+
+                    if ((Date.now() - start) >= maxWait) {
+                        cleanup();
+                        reject(new Error('Timed out waiting for video readiness'));
+                    }
+                };
+
+                scanVideo.addEventListener('loadedmetadata', onReadyCheck);
+                scanVideo.addEventListener('loadeddata', onReadyCheck);
+                scanVideo.addEventListener('canplay', onReadyCheck);
+
+                var poll = function () {
+                    if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
+                        cleanup();
+                        resolve();
+                        return;
+                    }
+
+                    if ((Date.now() - start) >= maxWait) {
+                        cleanup();
+                        reject(new Error('Timed out waiting for video readiness'));
+                        return;
+                    }
+
+                    window.setTimeout(poll, 120);
+                };
+
+                poll();
+            });
+        };
+
         var detectQrCode = async function () {
             if (detector) {
-                var nativeCodes = await detector.detect(scanVideo);
-                if (nativeCodes.length && nativeCodes[0].rawValue) {
-                    return nativeCodes[0].rawValue;
+                try {
+                    var nativeCodes = await detector.detect(scanVideo);
+                    if (nativeCodes.length && nativeCodes[0].rawValue) {
+                        return nativeCodes[0].rawValue;
+                    }
+                    return '';
+                } catch (nativeError) {
+                    detector = null;
                 }
-
-                return '';
             }
 
             var fallback = await loadFallbackDetector();
             var frameCanvas = createFrameCanvas();
+
             if (!frameCanvas) {
                 return '';
             }
@@ -424,9 +558,12 @@ define(['require'], function (require) {
                     var qrScannerResult = await window.QrScanner.scanImage(frameCanvas, {
                         returnDetailedScanResult: true
                     });
-                    return qrScannerResult && qrScannerResult.data ? qrScannerResult.data : qrScannerResult || '';
+
+                    return qrScannerResult && qrScannerResult.data ? qrScannerResult.data : (qrScannerResult || '');
                 } catch (e) {
-                    handleFallbackDecodeError(fallback.name, e);
+                    if (!isNoCodeDetectionError(e)) {
+                        // Runtime decode errors are transient on iOS; do not disable the library.
+                    }
                     return '';
                 }
             }
@@ -435,84 +572,100 @@ define(['require'], function (require) {
                 try {
                     var html5Blob = await toBlob(frameCanvas);
                     if (!html5Blob) {
-                        throw new Error('Failed to convert frame to blob');
+                        return '';
                     }
 
                     var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
                     return await fallback.detector.scanFile(html5File, false);
                 } catch (e) {
-                    handleFallbackDecodeError(fallback.name, e);
+                    if (!isNoCodeDetectionError(e)) {
+                        // Runtime decode errors are transient on iOS; do not disable the library.
+                    }
                     return '';
                 }
             }
 
             if (fallback.name === 'zxing' && fallback.detector) {
-                var zxingBlob = await toBlob(frameCanvas);
-                if (!zxingBlob) {
-                    return '';
-                }
-
-                var objectUrl = URL.createObjectURL(zxingBlob);
                 try {
-                    var image = await loadImageFromObjectUrl(objectUrl);
-                    var zxingResult = await fallback.detector.decodeFromImageElement(image);
-                    return zxingResult && zxingResult.text ? zxingResult.text : '';
+                    var zxingBlob = await toBlob(frameCanvas);
+                    if (!zxingBlob) {
+                        return '';
+                    }
+
+                    var objectUrl = URL.createObjectURL(zxingBlob);
+
+                    try {
+                        var image = await loadImageFromObjectUrl(objectUrl);
+                        var zxingResult = await fallback.detector.decodeFromImageElement(image);
+
+                        return zxingResult && zxingResult.text ? zxingResult.text : '';
+                    } finally {
+                        URL.revokeObjectURL(objectUrl);
+                    }
                 } catch (e) {
-                    handleFallbackDecodeError(fallback.name, e);
+                    if (!isNoCodeDetectionError(e)) {
+                        // Runtime decode errors are transient on iOS; do not disable the library.
+                    }
                     return '';
-                } finally {
-                    URL.revokeObjectURL(objectUrl);
                 }
             }
 
             return '';
         };
 
-        var waitForVideoReady = function (timeoutMs) {
-            return new Promise(function (resolve, reject) {
-                var timeout = timeoutMs || 5000;
-                var startedAt = Date.now();
+        var scheduleNextScan = function (delay) {
+            if (!isScannerOpen || isFinishingScan) {
+                return;
+            }
 
-                var cleanup = function () {
-                    scanVideo.removeEventListener('loadedmetadata', checkReadyState);
-                    scanVideo.removeEventListener('loadeddata', checkReadyState);
-                    scanVideo.removeEventListener('canplay', checkReadyState);
-                };
+            scanLoopTimer = window.setTimeout(runScanLoop, typeof delay === 'number' ? delay : 220);
+        };
 
-                var checkReadyState = function () {
-                    if (!stream) {
-                        cleanup();
-                        reject(new Error('Camera stream stopped before video became ready'));
-                        return;
-                    }
+        var runScanLoop = async function () {
+            if (!isScannerOpen || !stream || isFinishingScan) {
+                return;
+            }
 
-                    if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
-                        cleanup();
-                        resolve();
-                        return;
-                    }
+            if (isDetectingFrame) {
+                scheduleNextScan(180);
+                return;
+            }
 
-                    if (Date.now() - startedAt >= timeout) {
-                        cleanup();
-                        reject(new Error('Timed out while waiting for camera preview readiness'));
-                    }
-                };
+            isDetectingFrame = true;
 
-                scanVideo.addEventListener('loadedmetadata', checkReadyState);
-                scanVideo.addEventListener('loadeddata', checkReadyState);
-                scanVideo.addEventListener('canplay', checkReadyState);
-                checkReadyState();
-            });
+            try {
+                var qrValue = (await detectQrCode() || '').trim();
+
+                if (qrValue) {
+                    isFinishingScan = true;
+                    clearTimers();
+                    setMessage(messages.successDetected, false);
+
+                    successDelayTimer = window.setTimeout(function () {
+                        closeScanner();
+                        submitScannedCode(qrValue, allowedHosts);
+                    }, 650);
+
+                    return;
+                }
+            } catch (e) {
+                setMessage(messages.keepFocus, false);
+            } finally {
+                isDetectingFrame = false;
+            }
+
+            scheduleNextScan(220);
         };
 
         scanTrigger.addEventListener('click', async function () {
-            closeScanner();
+            closeScanner({syncHistory: false});
 
             if (!detector) {
                 if (!fallbackStatusMessageShown) {
                     setMessage(messages.loadingFallback, false);
                     fallbackStatusMessageShown = true;
                 }
+
                 try {
                     await loadFallbackDetector();
                 } catch (decoderError) {
@@ -546,6 +699,8 @@ define(['require'], function (require) {
             }
 
             isFinishingScan = false;
+            isDetectingFrame = false;
+
             scanVideo.srcObject = stream;
             scanModal.hidden = false;
             isScannerOpen = true;
@@ -563,35 +718,7 @@ define(['require'], function (require) {
                 return;
             }
 
-            scanTimer = window.setInterval(async function () {
-                if (!stream || isFinishingScan || isDetectingFrame) {
-                    return;
-                }
-
-                isDetectingFrame = true;
-                try {
-                    var qrValue = (await detectQrCode() || '').trim();
-                    if (!qrValue) {
-                        return;
-                    }
-
-                    isFinishingScan = true;
-                    if (scanTimer) {
-                        window.clearInterval(scanTimer);
-                        scanTimer = null;
-                    }
-
-                    setMessage(messages.successDetected, false);
-                    successDelayTimer = window.setTimeout(function () {
-                        closeScanner();
-                        submitScannedCode(qrValue, allowedHosts);
-                    }, 650);
-                } catch (e) {
-                    setMessage(messages.keepFocus, false);
-                } finally {
-                    isDetectingFrame = false;
-                }
-            }, 500);
+            scheduleNextScan(250);
         });
 
         scanStop.addEventListener('click', function () {
