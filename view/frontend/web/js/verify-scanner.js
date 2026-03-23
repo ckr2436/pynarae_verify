@@ -28,6 +28,7 @@ define(['require'], function (require) {
         var isScannerOpen = false;
         var scannerHistoryActive = false;
         var isDetectingFrame = false;
+        var openSessionId = 0;
         var messages = config.messages || {};
 
         var detector = null;
@@ -55,6 +56,25 @@ define(['require'], function (require) {
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
         };
 
+        var stopMediaStream = function (mediaStream) {
+            if (!mediaStream) {
+                return;
+            }
+
+            try {
+                mediaStream.getTracks().forEach(function (track) {
+                    track.stop();
+                });
+            } catch (e) {
+                // Ignore stop errors.
+            }
+        };
+
+        var invalidateOpenSession = function () {
+            openSessionId += 1;
+            return openSessionId;
+        };
+
         var clearTimers = function () {
             if (scanLoopTimer) {
                 window.clearTimeout(scanLoopTimer);
@@ -70,22 +90,18 @@ define(['require'], function (require) {
         var closeScanner = function (options) {
             var closeOptions = options || {};
 
+            if (closeOptions.invalidateSession) {
+                invalidateOpenSession();
+            }
+
             clearTimers();
 
             isFinishingScan = false;
             isScannerOpen = false;
             isDetectingFrame = false;
 
-            if (stream) {
-                try {
-                    stream.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-                } catch (e) {
-                    // Ignore stop errors.
-                }
-                stream = null;
-            }
+            stopMediaStream(stream);
+            stream = null;
 
             try {
                 scanVideo.pause();
@@ -212,6 +228,7 @@ define(['require'], function (require) {
 
             scriptLoadPromises[src] = new Promise(function (resolve, reject) {
                 var existing = document.querySelector('script[src="' + src + '"]');
+
                 if (existing) {
                     if (existing.getAttribute('data-loaded') === '1') {
                         resolve();
@@ -484,11 +501,12 @@ define(['require'], function (require) {
 
         scrollToResultIfPresent();
 
-        var waitForVideoReady = function (timeoutMs) {
-            var maxWait = typeof timeoutMs === 'number' ? timeoutMs : 4000;
+        var waitForVideoReady = function (timeoutMs, sessionId) {
+            var maxWait = typeof timeoutMs === 'number' ? timeoutMs : 5000;
 
             return new Promise(function (resolve, reject) {
                 var start = Date.now();
+                var settled = false;
 
                 var cleanup = function () {
                     scanVideo.removeEventListener('loadedmetadata', onReadyCheck);
@@ -496,16 +514,37 @@ define(['require'], function (require) {
                     scanVideo.removeEventListener('canplay', onReadyCheck);
                 };
 
+                var finishResolve = function () {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    cleanup();
+                    resolve();
+                };
+
+                var finishReject = function (error) {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                };
+
                 var onReadyCheck = function () {
+                    if (sessionId !== openSessionId) {
+                        finishReject(new Error('Scanner session changed'));
+                        return;
+                    }
+
                     if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
-                        cleanup();
-                        resolve();
+                        finishResolve();
                         return;
                     }
 
                     if ((Date.now() - start) >= maxWait) {
-                        cleanup();
-                        reject(new Error('Timed out waiting for video readiness'));
+                        finishReject(new Error('Timed out waiting for video readiness'));
                     }
                 };
 
@@ -514,15 +553,22 @@ define(['require'], function (require) {
                 scanVideo.addEventListener('canplay', onReadyCheck);
 
                 var poll = function () {
+                    if (settled) {
+                        return;
+                    }
+
+                    if (sessionId !== openSessionId) {
+                        finishReject(new Error('Scanner session changed'));
+                        return;
+                    }
+
                     if (scanVideo.readyState >= 2 && scanVideo.videoWidth > 0 && scanVideo.videoHeight > 0) {
-                        cleanup();
-                        resolve();
+                        finishResolve();
                         return;
                     }
 
                     if ((Date.now() - start) >= maxWait) {
-                        cleanup();
-                        reject(new Error('Timed out waiting for video readiness'));
+                        finishReject(new Error('Timed out waiting for video readiness'));
                         return;
                     }
 
@@ -561,9 +607,6 @@ define(['require'], function (require) {
 
                     return qrScannerResult && qrScannerResult.data ? qrScannerResult.data : (qrScannerResult || '');
                 } catch (e) {
-                    if (!isNoCodeDetectionError(e)) {
-                        // Runtime decode errors are transient on iOS; do not disable the library.
-                    }
                     return '';
                 }
             }
@@ -578,9 +621,6 @@ define(['require'], function (require) {
                     var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
                     return await fallback.detector.scanFile(html5File, false);
                 } catch (e) {
-                    if (!isNoCodeDetectionError(e)) {
-                        // Runtime decode errors are transient on iOS; do not disable the library.
-                    }
                     return '';
                 }
             }
@@ -603,9 +643,6 @@ define(['require'], function (require) {
                         URL.revokeObjectURL(objectUrl);
                     }
                 } catch (e) {
-                    if (!isNoCodeDetectionError(e)) {
-                        // Runtime decode errors are transient on iOS; do not disable the library.
-                    }
                     return '';
                 }
             }
@@ -613,21 +650,23 @@ define(['require'], function (require) {
             return '';
         };
 
-        var scheduleNextScan = function (delay) {
-            if (!isScannerOpen || isFinishingScan) {
+        var scheduleNextScan = function (sessionId, delay) {
+            if (!isScannerOpen || isFinishingScan || sessionId !== openSessionId) {
                 return;
             }
 
-            scanLoopTimer = window.setTimeout(runScanLoop, typeof delay === 'number' ? delay : 220);
+            scanLoopTimer = window.setTimeout(function () {
+                runScanLoop(sessionId);
+            }, typeof delay === 'number' ? delay : 220);
         };
 
-        var runScanLoop = async function () {
-            if (!isScannerOpen || !stream || isFinishingScan) {
+        var runScanLoop = async function (sessionId) {
+            if (sessionId !== openSessionId || !isScannerOpen || !stream || isFinishingScan) {
                 return;
             }
 
             if (isDetectingFrame) {
-                scheduleNextScan(180);
+                scheduleNextScan(sessionId, 180);
                 return;
             }
 
@@ -636,29 +675,45 @@ define(['require'], function (require) {
             try {
                 var qrValue = (await detectQrCode() || '').trim();
 
+                if (sessionId !== openSessionId) {
+                    return;
+                }
+
                 if (qrValue) {
                     isFinishingScan = true;
                     clearTimers();
                     setMessage(messages.successDetected, false);
 
                     successDelayTimer = window.setTimeout(function () {
-                        closeScanner();
+                        if (sessionId !== openSessionId) {
+                            return;
+                        }
+
+                        closeScanner({syncHistory: false, invalidateSession: true});
                         submitScannedCode(qrValue, allowedHosts);
                     }, 650);
 
                     return;
                 }
             } catch (e) {
-                setMessage(messages.keepFocus, false);
+                if (sessionId === openSessionId) {
+                    setMessage(messages.keepFocus, false);
+                }
             } finally {
                 isDetectingFrame = false;
             }
 
-            scheduleNextScan(220);
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            scheduleNextScan(sessionId, 220);
         };
 
         scanTrigger.addEventListener('click', async function () {
-            closeScanner({syncHistory: false});
+            closeScanner({syncHistory: false, invalidateSession: true});
+            var sessionId = openSessionId;
+            var sessionStream = null;
 
             if (!detector) {
                 if (!fallbackStatusMessageShown) {
@@ -669,13 +724,17 @@ define(['require'], function (require) {
                 try {
                     await loadFallbackDetector();
                 } catch (decoderError) {
+                    if (sessionId !== openSessionId) {
+                        return;
+                    }
+
                     setMessage(messages.noFallbackScanner, true);
                     return;
                 }
             }
 
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
+                sessionStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: {ideal: 'environment'}
                     },
@@ -683,25 +742,35 @@ define(['require'], function (require) {
                 });
             } catch (e) {
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({
+                    sessionStream = await navigator.mediaDevices.getUserMedia({
                         video: true,
                         audio: false
                     });
                 } catch (fallbackError) {
+                    if (sessionId !== openSessionId) {
+                        return;
+                    }
+
                     setMessage(messages.cameraDenied, true);
                     return;
                 }
             }
 
-            if (!stream) {
+            if (sessionId !== openSessionId) {
+                stopMediaStream(sessionStream);
+                return;
+            }
+
+            if (!sessionStream) {
                 setMessage(messages.cameraDenied, true);
                 return;
             }
 
+            stream = sessionStream;
             isFinishingScan = false;
             isDetectingFrame = false;
 
-            scanVideo.srcObject = stream;
+            scanVideo.srcObject = sessionStream;
             scanModal.hidden = false;
             isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
@@ -711,18 +780,39 @@ define(['require'], function (require) {
 
             try {
                 await scanVideo.play();
-                await waitForVideoReady(5000);
+
+                if (sessionId !== openSessionId) {
+                    stopMediaStream(sessionStream);
+                    return;
+                }
+
+                await waitForVideoReady(5000, sessionId);
+
+                if (sessionId !== openSessionId) {
+                    stopMediaStream(sessionStream);
+                    return;
+                }
             } catch (e) {
-                closeScanner();
+                if (sessionId !== openSessionId) {
+                    stopMediaStream(sessionStream);
+                    return;
+                }
+
+                closeScanner({syncHistory: false, invalidateSession: true});
                 setMessage(messages.previewFailed, true);
                 return;
             }
 
-            scheduleNextScan(250);
+            if (sessionId !== openSessionId) {
+                stopMediaStream(sessionStream);
+                return;
+            }
+
+            scheduleNextScan(sessionId, 250);
         });
 
         scanStop.addEventListener('click', function () {
-            closeScanner({syncHistory: true});
+            closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
         });
 
@@ -732,12 +822,12 @@ define(['require'], function (require) {
             }
 
             scannerHistoryActive = false;
-            closeScanner({syncHistory: false});
+            closeScanner({syncHistory: false, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
         });
 
         window.addEventListener('beforeunload', function () {
-            closeScanner({syncHistory: false});
+            closeScanner({syncHistory: false, invalidateSession: true});
         });
     };
 });
