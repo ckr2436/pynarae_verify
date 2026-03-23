@@ -1,4 +1,4 @@
-define([], function () {
+define(['require'], function (require) {
     'use strict';
 
     return function (config) {
@@ -176,6 +176,14 @@ define([], function () {
         var qrContext = null;
         var fallbackStatusMessageShown = false;
 
+
+        var assetUrls = {
+            qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
+            qrScannerWorker: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner-worker.min.js'),
+            html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
+            zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
+        };
+
         var loadScript = function (src) {
             return new Promise(function (resolve, reject) {
                 var script = document.createElement('script');
@@ -302,7 +310,7 @@ define([], function () {
                 if (isFallbackAvailable('qr-scanner') &&
                     window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
                     if (typeof window.QrScanner.WORKER_PATH === 'undefined') {
-                        window.QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+                        window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
                     }
 
                     activeFallback = {name: 'qr-scanner'};
@@ -313,9 +321,9 @@ define([], function () {
                     if (!isFallbackAvailable('qr-scanner')) {
                         throw new Error('qr-scanner fallback disabled');
                     }
-                    await loadScript('https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js');
+                    await loadScript(assetUrls.qrScanner);
                     if (window.QrScanner && typeof window.QrScanner.scanImage === 'function') {
-                        window.QrScanner.WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
+                        window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
                         activeFallback = {name: 'qr-scanner'};
                         return activeFallback;
                     }
@@ -327,7 +335,7 @@ define([], function () {
                     if (!isFallbackAvailable('html5-qrcode')) {
                         throw new Error('html5-qrcode fallback disabled');
                     }
-                    await loadScript('https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js');
+                    await loadScript(assetUrls.html5Qrcode);
                     if (window.Html5Qrcode && typeof window.Html5Qrcode.prototype.scanFile === 'function') {
                         if (!document.getElementById('pynarae-html5qrcode-offscreen')) {
                             var html5Root = document.createElement('div');
@@ -349,7 +357,7 @@ define([], function () {
                     if (!isFallbackAvailable('zxing')) {
                         throw new Error('zxing fallback disabled');
                     }
-                    await loadScript('https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js');
+                    await loadScript(assetUrls.zxing);
                     if (window.ZXing && typeof window.ZXing.BrowserQRCodeReader === 'function') {
                         activeFallback = {
                             name: 'zxing',
