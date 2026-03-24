@@ -950,15 +950,11 @@ define(['require'], function (require) {
             };
         };
 
-        var submitScannedCode = function (qrValue, allowedHosts) {
-            var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
-            if (!parsedResult.isValid) {
-                setMessage(parsedResult.errorMessage, true);
-                return;
-            }
+        var buildRequestNonce = function () {
+            return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
+        };
 
-            codeInput.value = parsedResult.code;
-
+        var ensureRequestNonce = function () {
             var tsInput = form.querySelector('input[name="_ts"]');
             if (!tsInput) {
                 tsInput = document.createElement('input');
@@ -967,8 +963,18 @@ define(['require'], function (require) {
                 form.appendChild(tsInput);
             }
 
-            tsInput.value = String(Date.now());
+            tsInput.value = buildRequestNonce();
+        };
 
+        var submitScannedCode = function (qrValue, allowedHosts) {
+            var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
+            if (!parsedResult.isValid) {
+                setMessage(parsedResult.errorMessage, true);
+                return;
+            }
+
+            codeInput.value = parsedResult.code;
+            ensureRequestNonce();
             setMessage(messages.successSubmitting, false);
             form.submit();
         };
@@ -1643,6 +1649,10 @@ define(['require'], function (require) {
         scanStop.addEventListener('click', function () {
             closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
+        });
+
+        form.addEventListener('submit', function () {
+            ensureRequestNonce();
         });
 
         window.addEventListener('popstate', function () {
