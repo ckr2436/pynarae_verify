@@ -120,7 +120,7 @@ class GenerateCsvCommand extends Command
             $header[] = 'qr_image_url';
         }
 
-        fputcsv($handle, $header);
+        fputcsv($handle, $header, ',', '"', '\\');
 
         foreach ($codes as $code) {
             $verifyValue = $code;
@@ -160,7 +160,7 @@ class GenerateCsvCommand extends Command
                 ]);
             }
 
-            fputcsv($handle, $row);
+            fputcsv($handle, $row, ',', '"', '\\');
         }
 
         fclose($handle);

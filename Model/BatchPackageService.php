@@ -112,7 +112,7 @@ class BatchPackageService
         if ($includeQrSvg) {
             $header[] = 'qr_svg_file';
         }
-        fputcsv($handle, $header);
+        fputcsv($handle, $header, ',', '"', '\\');
 
         $insertRows = [];
         $qrFiles = [];
@@ -165,7 +165,7 @@ class BatchPackageService
                 $row[] = 'qr/' . $safeName . '.svg';
             }
 
-            fputcsv($handle, $row);
+            fputcsv($handle, $row, ',', '"', '\\');
 
             if ($insert) {
                 $insertRows[] = [
