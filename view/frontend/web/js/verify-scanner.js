@@ -77,6 +77,7 @@ define(['require'], function (require) {
         var html5StartPromise = null;
         var html5ScannerState = 'idle';
         var html5PatchTimers = [];
+        var iosAutoZoomTimers = [];
 
         var setMessage = function (message, isError) {
             scanMessage.textContent = message || '';
@@ -119,6 +120,121 @@ define(['require'], function (require) {
                 window.clearTimeout(timerId);
             });
             html5PatchTimers = [];
+        };
+
+        var clearIosAutoZoomTimers = function () {
+            iosAutoZoomTimers.forEach(function (timerId) {
+                window.clearTimeout(timerId);
+            });
+            iosAutoZoomTimers = [];
+        };
+
+        var getIosScannerVideoTrack = function () {
+            if (!iosOverlayCameraRoot) {
+                return null;
+            }
+
+            var video = iosOverlayCameraRoot.querySelector('video');
+            if (!video || !video.srcObject || typeof video.srcObject.getVideoTracks !== 'function') {
+                return null;
+            }
+
+            var tracks = video.srcObject.getVideoTracks();
+            return tracks && tracks.length ? tracks[0] : null;
+        };
+
+        var getTrackZoomRange = function (track) {
+            if (!track || typeof track.getCapabilities !== 'function') {
+                return null;
+            }
+
+            try {
+                var capabilities = track.getCapabilities();
+                if (!capabilities || typeof capabilities.zoom === 'undefined') {
+                    return null;
+                }
+
+                if (typeof capabilities.zoom === 'number') {
+                    return {
+                        min: 1,
+                        max: capabilities.zoom,
+                        step: 0.1
+                    };
+                }
+
+                return {
+                    min: typeof capabilities.zoom.min === 'number' ? capabilities.zoom.min : 1,
+                    max: typeof capabilities.zoom.max === 'number' ? capabilities.zoom.max : 1,
+                    step: typeof capabilities.zoom.step === 'number' ? capabilities.zoom.step : 0.1
+                };
+            } catch (e) {
+                return null;
+            }
+        };
+
+        var clampZoomFactor = function (range, factor) {
+            var min = range && typeof range.min === 'number' ? range.min : 1;
+            var max = range && typeof range.max === 'number' ? range.max : min;
+            var step = range && typeof range.step === 'number' && range.step > 0 ? range.step : 0.1;
+
+            var target = Math.min(max, Math.max(min, factor));
+
+            if (step > 0) {
+                target = Math.round(target / step) * step;
+                target = Math.min(max, Math.max(min, target));
+            }
+
+            return Number(target.toFixed(2));
+        };
+
+        var applyIosTrackZoomFactor = async function (factor) {
+            var track = getIosScannerVideoTrack();
+            var zoomRange = getTrackZoomRange(track);
+
+            if (!track || !zoomRange || typeof track.applyConstraints !== 'function') {
+                return false;
+            }
+
+            var targetZoom = clampZoomFactor(zoomRange, factor);
+
+            try {
+                await track.applyConstraints({
+                    advanced: [{zoom: targetZoom}]
+                });
+                return true;
+            } catch (firstError) {
+                try {
+                    await track.applyConstraints({
+                        zoom: targetZoom
+                    });
+                    return true;
+                } catch (secondError) {
+                    return false;
+                }
+            }
+        };
+
+        var scheduleIosAutoZoom = function (sessionId) {
+            clearIosAutoZoomTimers();
+
+            [
+                {delay: 120, factor: 1.0},
+                {delay: 1200, factor: 2.0},
+                {delay: 2200, factor: 2.8},
+                {delay: 3200, factor: 3.5}
+            ].forEach(function (item) {
+                var timerId = window.setTimeout(function () {
+                    if (sessionId !== openSessionId || !isScannerOpen || isFinishingScan || html5ScannerState !== 'running') {
+                        return;
+                    }
+
+                    applyIosTrackZoomFactor(item.factor).then(function () {
+                        // Ignore unsupported zoom devices silently.
+                    });
+                }, item.delay);
+
+                iosAutoZoomTimers.push(timerId);
+            });
         };
 
         var ensureIosOverlay = function () {
@@ -294,6 +410,7 @@ define(['require'], function (require) {
 
         var stopHtml5Scanner = function () {
             clearHtml5PatchTimers();
+            clearIosAutoZoomTimers();
 
             if (!html5Scanner) {
                 hideIosOverlay();
@@ -450,11 +567,26 @@ define(['require'], function (require) {
         };
 
         var getHtml5QrcodeConfig = function () {
-            return {
+            var config = {
                 fps: 10,
                 rememberLastUsedCamera: false,
                 disableFlip: false
             };
+
+            if (isAppleMobileDevice) {
+                config.fps = 12;
+                config.qrbox = function (viewfinderWidth, viewfinderHeight) {
+                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.62);
+                    edge = Math.max(200, Math.min(320, edge));
+
+                    return {
+                        width: edge,
+                        height: edge
+                    };
+                };
+            }
+
+            return config;
         };
 
         var startIosHtml5QrcodeScanner = async function (sessionId) {
@@ -488,6 +620,7 @@ define(['require'], function (require) {
 
                 isFinishingScan = true;
                 clearTimers();
+                clearIosAutoZoomTimers();
                 setMessage(messages.successDetected, false);
 
                 successDelayTimer = window.setTimeout(function () {
@@ -519,6 +652,7 @@ define(['require'], function (require) {
                 html5ScannerState = 'running';
                 patchIosHtml5Preview();
                 scheduleIosHtml5Patches();
+                scheduleIosAutoZoom(sessionId);
             }).catch(function (startError) {
                 html5ScannerState = 'idle';
                 html5Scanner = null;
