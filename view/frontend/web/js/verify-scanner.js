@@ -38,25 +38,29 @@ define(['require'], function (require) {
         var qrContext = null;
         var fallbackStatusMessageShown = false;
         var scriptLoadPromises = {};
+
         var detectorLoadFailures = {
             'qr-scanner': false,
             'html5-qrcode': false,
             'zxing': false
         };
-        var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        var preferHtml5QrcodeFallback = false;
+
         var sessionFallbackFailures = {
             'qr-scanner': 0,
             'html5-qrcode': 0,
             'zxing': 0
         };
+
         var sessionDisabledFallbacks = {
             'qr-scanner': false,
             'html5-qrcode': false,
             'zxing': false
         };
+
         var runtimeFallbackFailureLimit = 2;
+
+        var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
         var assetUrls = {
             qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
@@ -64,6 +68,15 @@ define(['require'], function (require) {
             html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
             zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
         };
+
+        var iosOverlay = null;
+        var iosOverlayCameraRoot = null;
+        var iosOverlayStopButton = null;
+        var iosOverlayTitle = null;
+        var html5Scanner = null;
+        var html5StartPromise = null;
+        var html5ScannerState = 'idle';
+        var html5PatchTimers = [];
 
         var setMessage = function (message, isError) {
             scanMessage.textContent = message || '';
@@ -101,6 +114,268 @@ define(['require'], function (require) {
             }
         };
 
+        var clearHtml5PatchTimers = function () {
+            html5PatchTimers.forEach(function (timerId) {
+                window.clearTimeout(timerId);
+            });
+            html5PatchTimers = [];
+        };
+
+        var ensureIosOverlay = function () {
+            if (iosOverlay) {
+                return iosOverlay;
+            }
+
+            iosOverlay = document.createElement('div');
+            iosOverlay.id = 'pynarae-ios-scanner-overlay';
+            iosOverlay.style.position = 'fixed';
+            iosOverlay.style.left = '0';
+            iosOverlay.style.top = '0';
+            iosOverlay.style.right = '0';
+            iosOverlay.style.bottom = '0';
+            iosOverlay.style.width = '100vw';
+            iosOverlay.style.height = '100vh';
+            iosOverlay.style.background = '#000';
+            iosOverlay.style.zIndex = '999999';
+            iosOverlay.style.display = 'none';
+            iosOverlay.style.overflow = 'hidden';
+
+            iosOverlayCameraRoot = document.createElement('div');
+            iosOverlayCameraRoot.id = 'pynarae-ios-html5-camera';
+            iosOverlayCameraRoot.style.position = 'absolute';
+            iosOverlayCameraRoot.style.left = '0';
+            iosOverlayCameraRoot.style.top = '0';
+            iosOverlayCameraRoot.style.right = '0';
+            iosOverlayCameraRoot.style.bottom = '0';
+            iosOverlayCameraRoot.style.width = '100%';
+            iosOverlayCameraRoot.style.height = '100%';
+            iosOverlayCameraRoot.style.background = '#000';
+            iosOverlayCameraRoot.style.overflow = 'hidden';
+
+            var scanGuide = document.createElement('div');
+            scanGuide.style.position = 'absolute';
+            scanGuide.style.left = '50%';
+            scanGuide.style.top = '50%';
+            scanGuide.style.width = '72vw';
+            scanGuide.style.height = '72vw';
+            scanGuide.style.maxWidth = '320px';
+            scanGuide.style.maxHeight = '320px';
+            scanGuide.style.transform = 'translate(-50%, -50%)';
+            scanGuide.style.border = '6px solid rgba(255,255,255,0.92)';
+            scanGuide.style.borderRadius = '28px';
+            scanGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18)';
+            scanGuide.style.pointerEvents = 'none';
+            scanGuide.style.zIndex = '3';
+
+            iosOverlayTitle = document.createElement('div');
+            iosOverlayTitle.style.position = 'absolute';
+            iosOverlayTitle.style.left = '20px';
+            iosOverlayTitle.style.right = '20px';
+            iosOverlayTitle.style.top = 'calc(env(safe-area-inset-top, 0px) + 18px)';
+            iosOverlayTitle.style.textAlign = 'center';
+            iosOverlayTitle.style.color = '#fff';
+            iosOverlayTitle.style.fontSize = '16px';
+            iosOverlayTitle.style.fontWeight = '600';
+            iosOverlayTitle.style.letterSpacing = '0.02em';
+            iosOverlayTitle.style.zIndex = '4';
+            iosOverlayTitle.textContent = 'Align the QR code within the frame';
+
+            iosOverlayStopButton = document.createElement('button');
+            iosOverlayStopButton.type = 'button';
+            iosOverlayStopButton.textContent = 'Stop Camera';
+            iosOverlayStopButton.style.position = 'absolute';
+            iosOverlayStopButton.style.left = '50%';
+            iosOverlayStopButton.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + 28px)';
+            iosOverlayStopButton.style.transform = 'translateX(-50%)';
+            iosOverlayStopButton.style.zIndex = '4';
+            iosOverlayStopButton.style.minWidth = '180px';
+            iosOverlayStopButton.style.padding = '14px 20px';
+            iosOverlayStopButton.style.border = '0';
+            iosOverlayStopButton.style.borderRadius = '14px';
+            iosOverlayStopButton.style.background = '#fff';
+            iosOverlayStopButton.style.color = '#444';
+            iosOverlayStopButton.style.fontSize = '15px';
+            iosOverlayStopButton.style.fontWeight = '600';
+            iosOverlayStopButton.style.letterSpacing = '0.08em';
+            iosOverlayStopButton.style.textTransform = 'uppercase';
+
+            iosOverlayStopButton.addEventListener('click', function () {
+                closeScanner({syncHistory: true, invalidateSession: true});
+                setMessage(messages.scanFailedRetry, true);
+            });
+
+            iosOverlay.appendChild(iosOverlayCameraRoot);
+            iosOverlay.appendChild(scanGuide);
+            iosOverlay.appendChild(iosOverlayTitle);
+            iosOverlay.appendChild(iosOverlayStopButton);
+            document.body.appendChild(iosOverlay);
+
+            return iosOverlay;
+        };
+
+        var showIosOverlay = function () {
+            ensureIosOverlay();
+            iosOverlay.style.display = 'block';
+        };
+
+        var hideIosOverlay = function () {
+            clearHtml5PatchTimers();
+
+            if (iosOverlayCameraRoot) {
+                iosOverlayCameraRoot.innerHTML = '';
+            }
+
+            if (iosOverlay) {
+                iosOverlay.style.display = 'none';
+            }
+        };
+
+        var patchIosHtml5Preview = function () {
+            if (!iosOverlayCameraRoot) {
+                return;
+            }
+
+            var video = iosOverlayCameraRoot.querySelector('video');
+            if (video) {
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('webkit-playsinline', 'true');
+                video.setAttribute('autoplay', 'true');
+                video.setAttribute('muted', 'true');
+                video.playsInline = true;
+                video.muted = true;
+                video.autoplay = true;
+                video.controls = false;
+                video.style.position = 'absolute';
+                video.style.left = '0';
+                video.style.top = '0';
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.background = '#000';
+                video.style.display = 'block';
+                video.style.visibility = 'visible';
+                video.style.opacity = '1';
+                try {
+                    video.play();
+                } catch (e) {
+                    // Ignore play errors.
+                }
+            }
+
+            var canvases = iosOverlayCameraRoot.querySelectorAll('canvas');
+            Array.prototype.forEach.call(canvases, function (canvas) {
+                canvas.style.position = 'absolute';
+                canvas.style.left = '0';
+                canvas.style.top = '0';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                canvas.style.objectFit = 'cover';
+            });
+
+            var divs = iosOverlayCameraRoot.querySelectorAll('div');
+            Array.prototype.forEach.call(divs, function (div) {
+                div.style.width = '100%';
+                if (!div.style.height) {
+                    div.style.height = '100%';
+                }
+            });
+        };
+
+        var scheduleIosHtml5Patches = function () {
+            clearHtml5PatchTimers();
+
+            [0, 80, 180, 320, 600, 1000, 1600].forEach(function (delay) {
+                var timerId = window.setTimeout(function () {
+                    patchIosHtml5Preview();
+                }, delay);
+                html5PatchTimers.push(timerId);
+            });
+        };
+
+        var stopHtml5Scanner = function () {
+            clearHtml5PatchTimers();
+
+            if (!html5Scanner) {
+                hideIosOverlay();
+                html5ScannerState = 'idle';
+                html5StartPromise = null;
+                return Promise.resolve();
+            }
+
+            var scannerToStop = html5Scanner;
+            var pendingStart = html5StartPromise;
+
+            if (html5ScannerState === 'starting' && pendingStart) {
+                return pendingStart.catch(function () {
+                    // Ignore start errors.
+                }).then(function () {
+                    if (!scannerToStop || html5ScannerState !== 'running') {
+                        try {
+                            if (scannerToStop && typeof scannerToStop.clear === 'function') {
+                                scannerToStop.clear();
+                            }
+                        } catch (e) {
+                            // Ignore clear errors.
+                        }
+                        html5Scanner = null;
+                        html5ScannerState = 'idle';
+                        html5StartPromise = null;
+                        hideIosOverlay();
+                        return;
+                    }
+
+                    return scannerToStop.stop().catch(function () {
+                        // Ignore stop errors.
+                    }).then(function () {
+                        try {
+                            if (typeof scannerToStop.clear === 'function') {
+                                scannerToStop.clear();
+                            }
+                        } catch (e) {
+                            // Ignore clear errors.
+                        }
+
+                        html5Scanner = null;
+                        html5ScannerState = 'idle';
+                        html5StartPromise = null;
+                        hideIosOverlay();
+                    });
+                });
+            }
+
+            if (html5ScannerState !== 'running') {
+                try {
+                    if (typeof scannerToStop.clear === 'function') {
+                        scannerToStop.clear();
+                    }
+                } catch (e) {
+                    // Ignore clear errors.
+                }
+                html5Scanner = null;
+                html5ScannerState = 'idle';
+                html5StartPromise = null;
+                hideIosOverlay();
+                return Promise.resolve();
+            }
+
+            return scannerToStop.stop().catch(function () {
+                // Ignore stop errors.
+            }).then(function () {
+                try {
+                    if (typeof scannerToStop.clear === 'function') {
+                        scannerToStop.clear();
+                    }
+                } catch (e) {
+                    // Ignore clear errors.
+                }
+
+                html5Scanner = null;
+                html5ScannerState = 'idle';
+                html5StartPromise = null;
+                hideIosOverlay();
+            });
+        };
+
         var closeScanner = function (options) {
             var closeOptions = options || {};
 
@@ -117,6 +392,8 @@ define(['require'], function (require) {
             stopMediaStream(stream);
             stream = null;
 
+            stopHtml5Scanner();
+
             try {
                 scanVideo.pause();
             } catch (e) {
@@ -124,13 +401,133 @@ define(['require'], function (require) {
             }
 
             scanVideo.srcObject = null;
+            scanVideo.hidden = false;
             scanModal.hidden = true;
             document.body.classList.remove('pynarae-verify--scanner-open');
+            hideIosOverlay();
 
             if (closeOptions.syncHistory !== false && scannerHistoryActive) {
                 scannerHistoryActive = false;
                 window.history.back();
             }
+        };
+
+        var selectPreferredHtml5CameraId = function (cameras) {
+            if (!cameras || !cameras.length) {
+                return null;
+            }
+
+            var backCamera = cameras.find(function (camera) {
+                return /back|rear|environment/i.test(camera.label || '');
+            });
+
+            if (backCamera) {
+                return backCamera.id;
+            }
+
+            return cameras[cameras.length - 1].id;
+        };
+
+        var getHtml5CameraSource = async function () {
+            await ensureHtml5QrcodeLoaded();
+
+            if (typeof window.Html5Qrcode.getCameras === 'function') {
+                try {
+                    var cameras = await window.Html5Qrcode.getCameras();
+                    var preferredCameraId = selectPreferredHtml5CameraId(cameras);
+
+                    if (preferredCameraId) {
+                        return preferredCameraId;
+                    }
+                } catch (e) {
+                    // Fall through.
+                }
+            }
+
+            return {
+                facingMode: 'environment'
+            };
+        };
+
+        var getHtml5QrcodeConfig = function () {
+            return {
+                fps: 10,
+                rememberLastUsedCamera: false,
+                disableFlip: false
+            };
+        };
+
+        var startIosHtml5QrcodeScanner = async function (sessionId) {
+            await ensureHtml5QrcodeLoaded();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            await stopHtml5Scanner();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            ensureIosOverlay();
+            showIosOverlay();
+
+            html5Scanner = new window.Html5Qrcode(iosOverlayCameraRoot.id);
+            html5ScannerState = 'starting';
+
+            var onScanSuccess = function (decodedText) {
+                if (sessionId !== openSessionId || isFinishingScan) {
+                    return;
+                }
+
+                var qrValue = (decodedText || '').trim();
+                if (!qrValue) {
+                    return;
+                }
+
+                isFinishingScan = true;
+                clearTimers();
+                setMessage(messages.successDetected, false);
+
+                successDelayTimer = window.setTimeout(function () {
+                    if (sessionId !== openSessionId) {
+                        return;
+                    }
+
+                    closeScanner({syncHistory: true, invalidateSession: true});
+                    submitScannedCode(qrValue, allowedHosts);
+                }, 650);
+            };
+
+            var onScanFailure = function () {
+                // Ignore per-frame misses.
+            };
+
+            var cameraSource = await getHtml5CameraSource();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            html5StartPromise = html5Scanner.start(
+                cameraSource,
+                getHtml5QrcodeConfig(),
+                onScanSuccess,
+                onScanFailure
+            ).then(function () {
+                html5ScannerState = 'running';
+                patchIosHtml5Preview();
+                scheduleIosHtml5Patches();
+            }).catch(function (startError) {
+                html5ScannerState = 'idle';
+                html5Scanner = null;
+                html5StartPromise = null;
+                hideIosOverlay();
+                throw startError;
+            });
+
+            return html5StartPromise;
         };
 
         var parseScannedCode = function (rawValue) {
@@ -434,27 +831,15 @@ define(['require'], function (require) {
                 throw new Error('html5-qrcode disabled because of prior load/init failure');
             }
 
-            if (!window.Html5Qrcode || typeof window.Html5Qrcode.prototype.scanFile !== 'function') {
+            if (!window.Html5Qrcode || typeof window.Html5Qrcode !== 'function') {
                 await loadScript(assetUrls.html5Qrcode);
             }
 
-            if (!window.Html5Qrcode || typeof window.Html5Qrcode.prototype.scanFile !== 'function') {
+            if (!window.Html5Qrcode || typeof window.Html5Qrcode !== 'function') {
                 throw new Error('Html5Qrcode did not initialize correctly');
             }
 
-            if (!document.getElementById('pynarae-html5qrcode-offscreen')) {
-                var html5Root = document.createElement('div');
-                html5Root.id = 'pynarae-html5qrcode-offscreen';
-                html5Root.hidden = true;
-                document.body.appendChild(html5Root);
-            }
-
-            activeFallback = {
-                name: 'html5-qrcode',
-                detector: new window.Html5Qrcode('pynarae-html5qrcode-offscreen')
-            };
-
-            return activeFallback;
+            return true;
         };
 
         var ensureZxingLoaded = async function () {
@@ -488,11 +873,7 @@ define(['require'], function (require) {
             }
 
             fallbackLoader = (async function () {
-                var orderedFallbacks = (isAppleMobileDevice && !preferHtml5QrcodeFallback) ? [
-                    {name: 'qr-scanner', load: ensureQrScannerLoaded},
-                    {name: 'zxing', load: ensureZxingLoaded},
-                    {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded}
-                ] : [
+                var orderedFallbacks = [
                     {name: 'qr-scanner', load: ensureQrScannerLoaded},
                     {name: 'html5-qrcode', load: ensureHtml5QrcodeLoaded},
                     {name: 'zxing', load: ensureZxingLoaded}
@@ -506,7 +887,14 @@ define(['require'], function (require) {
                     }
 
                     try {
-                        return await item.load();
+                        var loaded = await item.load();
+                        if (item.name === 'html5-qrcode') {
+                            activeFallback = {
+                                name: 'html5-qrcode'
+                            };
+                            return activeFallback;
+                        }
+                        return loaded;
                     } catch (e) {
                         if (sessionDisabledFallbacks[item.name] === true) {
                             continue;
@@ -670,19 +1058,8 @@ define(['require'], function (require) {
                 }
             }
 
-            if (fallback.name === 'html5-qrcode' && fallback.detector) {
-                try {
-                    var html5Blob = await toBlob(frameCanvas);
-                    if (!html5Blob) {
-                        return '';
-                    }
-
-                    var html5File = new File([html5Blob], 'frame.png', {type: 'image/png'});
-                    return await fallback.detector.scanFile(html5File, false);
-                } catch (e) {
-                    rotateFallbackOnRuntimeError('html5-qrcode', e);
-                    return '';
-                }
+            if (fallback.name === 'html5-qrcode') {
+                return '';
             }
 
             if (fallback.name === 'zxing' && fallback.detector) {
@@ -774,8 +1151,33 @@ define(['require'], function (require) {
         scanTrigger.addEventListener('click', async function () {
             closeScanner({syncHistory: false, invalidateSession: true});
             resetFallbackSessionState();
+            await stopHtml5Scanner();
+
             var sessionId = openSessionId;
             var sessionStream = null;
+
+            if (isAppleMobileDevice) {
+                scanModal.hidden = true;
+                scanVideo.hidden = true;
+                isScannerOpen = true;
+                document.body.classList.add('pynarae-verify--scanner-open');
+                window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+                scannerHistoryActive = true;
+                setMessage(messages.scanning, false);
+
+                try {
+                    await startIosHtml5QrcodeScanner(sessionId);
+                } catch (iosStartError) {
+                    if (sessionId !== openSessionId) {
+                        return;
+                    }
+
+                    closeScanner({syncHistory: true, invalidateSession: true});
+                    setMessage(messages.previewFailed, true);
+                }
+
+                return;
+            }
 
             if (!detector) {
                 if (!fallbackStatusMessageShown) {
@@ -832,6 +1234,7 @@ define(['require'], function (require) {
             isFinishingScan = false;
             isDetectingFrame = false;
 
+            scanVideo.hidden = false;
             scanVideo.srcObject = sessionStream;
             scanModal.hidden = false;
             isScannerOpen = true;
