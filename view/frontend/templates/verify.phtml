@@ -17,8 +17,8 @@ $submittedCode = $block->getSubmittedCode();
             </div>
         <?php else: ?>
             <div class="pynarae-verify__scanner" data-role="qr-scanner" data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>">
-                <button class="action secondary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
-                    <span><?= $block->escapeHtml(__('Scan QR code with camera')) ?></span>
+                <button class="action primary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
+                    <span><?= $block->escapeHtml(__('SCAN QR CODE')) ?></span>
                 </button>
                 <p class="pynarae-verify__scanner-message" data-role="scan-message"></p>
                 <div class="pynarae-verify__scanner-modal" data-role="scan-modal" hidden>
