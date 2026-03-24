@@ -986,6 +986,10 @@ define(['require'], function (require) {
             setMessage(messages.desktopGuide, false);
         }
 
+        form.addEventListener('submit', function () {
+            ensureRequestNonce();
+        });
+
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             scanTrigger.hidden = true;
             setMessage(messages.noCameraApi, true);
@@ -1649,10 +1653,6 @@ define(['require'], function (require) {
         scanStop.addEventListener('click', function () {
             closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
-        });
-
-        form.addEventListener('submit', function () {
-            ensureRequestNonce();
         });
 
         window.addEventListener('popstate', function () {
