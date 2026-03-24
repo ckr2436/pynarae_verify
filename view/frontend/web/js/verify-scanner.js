@@ -514,11 +514,22 @@ define(['require'], function (require) {
             scanRegion.style.boxShadow = 'none';
             scanRegion.style.outline = '0';
 
-            Array.prototype.forEach.call(scanRegion.querySelectorAll('div'), function (div) {
-                div.style.background = 'transparent';
-                div.style.border = '0';
-                div.style.boxShadow = 'none';
-                div.style.outline = '0';
+            Array.prototype.forEach.call(scanRegion.querySelectorAll('*'), function (node) {
+                var tag = (node.tagName || '').toLowerCase();
+
+                if (tag === 'video' || tag === 'canvas') {
+                    node.style.background = 'transparent';
+                    node.style.border = '0';
+                    node.style.boxShadow = 'none';
+                    node.style.outline = '0';
+                    return;
+                }
+
+                node.style.display = 'none';
+                node.style.background = 'transparent';
+                node.style.border = '0';
+                node.style.boxShadow = 'none';
+                node.style.outline = '0';
             });
         };
 
@@ -581,14 +592,6 @@ define(['require'], function (require) {
                 canvas.style.width = '100%';
                 canvas.style.height = '100%';
                 canvas.style.objectFit = 'cover';
-            });
-
-            var divs = iosOverlayCameraRoot.querySelectorAll('div');
-            Array.prototype.forEach.call(divs, function (div) {
-                div.style.width = '100%';
-                if (!div.style.height) {
-                    div.style.height = '100%';
-                }
             });
 
             stripIosHtml5QrcodeVisuals();
