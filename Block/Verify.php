@@ -15,6 +15,7 @@ class Verify extends Template
 {
     private ?array $verificationResult = null;
     private bool $verificationLoaded = false;
+    private ?string $requestNonce = null;
 
     public function __construct(
         Context $context,
@@ -102,6 +103,24 @@ class Verify extends Template
     public function getVerifyUrl(): string
     {
         return $this->getUrl('verify');
+    }
+
+    public function getRequestNonce(): string
+    {
+        if ($this->requestNonce !== null) {
+            return $this->requestNonce;
+        }
+
+        try {
+            $random = bin2hex(random_bytes(8));
+        } catch (\Throwable $e) {
+            $random = str_replace('.', '', uniqid('', true));
+        }
+
+        $microtime = str_replace('.', '', sprintf('%.6f', microtime(true)));
+        $this->requestNonce = $microtime . '-' . $random;
+
+        return $this->requestNonce;
     }
 
     public function getStatusCssClass(): string
