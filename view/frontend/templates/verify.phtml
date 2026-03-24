@@ -35,7 +35,7 @@ $submittedCode = $block->getSubmittedCode();
             </div>
 
             <form class="pynarae-verify__form" method="get" action="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
-                <input type="hidden" name="_ts" value="<?= $block->escapeHtmlAttr((string)time()) ?>" />
+                <input type="hidden" name="_ts" value="" />
                 <label class="pynarae-verify__label" for="verify-code">
                     <?= $block->escapeHtml(__('Verification code')) ?>
                 </label>
