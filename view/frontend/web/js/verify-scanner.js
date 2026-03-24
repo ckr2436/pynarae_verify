@@ -71,6 +71,7 @@ define(['require'], function (require) {
 
         var iosOverlay = null;
         var iosOverlayCameraRoot = null;
+        var iosOverlayGuide = null;
         var iosOverlayStopButton = null;
         var iosOverlayTitle = null;
         var html5Scanner = null;
@@ -84,6 +85,7 @@ define(['require'], function (require) {
         var iosPendingZoomFactor = null;
         var iosZoomApplyInFlight = false;
         var iosPinchListenersBound = false;
+        var scanModalPinchListenersBound = false;
 
         var setMessage = function (message, isError) {
             scanMessage.textContent = message || '';
@@ -157,6 +159,19 @@ define(['require'], function (require) {
             return tracks && tracks.length ? tracks[0] : null;
         };
 
+        var getDefaultScannerVideoTrack = function () {
+            if (!scanVideo || !scanVideo.srcObject || typeof scanVideo.srcObject.getVideoTracks !== 'function') {
+                return null;
+            }
+
+            var tracks = scanVideo.srcObject.getVideoTracks();
+            return tracks && tracks.length ? tracks[0] : null;
+        };
+
+        var getActiveScannerVideoTrack = function () {
+            return getIosScannerVideoTrack() || getDefaultScannerVideoTrack();
+        };
+
         var getTrackZoomRange = function (track) {
             if (!track || typeof track.getCapabilities !== 'function') {
                 return null;
@@ -202,7 +217,7 @@ define(['require'], function (require) {
         };
 
         var getCurrentTrackZoomFactor = function () {
-            var track = getIosScannerVideoTrack();
+            var track = getActiveScannerVideoTrack();
             var zoomRange = getTrackZoomRange(track);
 
             if (!track || !zoomRange) {
@@ -224,7 +239,7 @@ define(['require'], function (require) {
         };
 
         var applyIosTrackZoomFactor = function (factor) {
-            var track = getIosScannerVideoTrack();
+            var track = getActiveScannerVideoTrack();
             var zoomRange = getTrackZoomRange(track);
 
             if (!track || !zoomRange || typeof track.applyConstraints !== 'function') {
@@ -265,7 +280,7 @@ define(['require'], function (require) {
         };
 
         var handleIosPinchTouchStart = function (event) {
-            if (!isScannerOpen || html5ScannerState !== 'running') {
+            if (!isScannerOpen) {
                 return;
             }
 
@@ -273,7 +288,7 @@ define(['require'], function (require) {
                 return;
             }
 
-            var track = getIosScannerVideoTrack();
+            var track = getActiveScannerVideoTrack();
             var zoomRange = getTrackZoomRange(track);
             if (!track || !zoomRange) {
                 return;
@@ -292,7 +307,7 @@ define(['require'], function (require) {
                 return;
             }
 
-            var track = getIosScannerVideoTrack();
+            var track = getActiveScannerVideoTrack();
             var zoomRange = getTrackZoomRange(track);
             if (!track || !zoomRange) {
                 return;
@@ -352,6 +367,29 @@ define(['require'], function (require) {
             iosPinchListenersBound = true;
         };
 
+        var bindScanModalPinchZoomListeners = function () {
+            if (!scanModal || scanModalPinchListenersBound) {
+                return;
+            }
+
+            scanModal.style.touchAction = 'none';
+
+            scanModal.addEventListener('touchstart', handleIosPinchTouchStart, {
+                passive: false
+            });
+            scanModal.addEventListener('touchmove', handleIosPinchTouchMove, {
+                passive: false
+            });
+            scanModal.addEventListener('touchend', handleIosPinchTouchEnd, {
+                passive: true
+            });
+            scanModal.addEventListener('touchcancel', handleIosPinchTouchEnd, {
+                passive: true
+            });
+
+            scanModalPinchListenersBound = true;
+        };
+
         var ensureIosOverlay = function () {
             if (iosOverlay) {
                 return iosOverlay;
@@ -384,20 +422,20 @@ define(['require'], function (require) {
             iosOverlayCameraRoot.style.overflow = 'hidden';
             iosOverlayCameraRoot.style.touchAction = 'none';
 
-            var scanGuide = document.createElement('div');
-            scanGuide.style.position = 'absolute';
-            scanGuide.style.left = '50%';
-            scanGuide.style.top = '50%';
-            scanGuide.style.width = '72vw';
-            scanGuide.style.height = '72vw';
-            scanGuide.style.maxWidth = '320px';
-            scanGuide.style.maxHeight = '320px';
-            scanGuide.style.transform = 'translate(-50%, -50%)';
-            scanGuide.style.border = '6px solid rgba(255,255,255,0.92)';
-            scanGuide.style.borderRadius = '28px';
-            scanGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18)';
-            scanGuide.style.pointerEvents = 'none';
-            scanGuide.style.zIndex = '3';
+            iosOverlayGuide = document.createElement('div');
+            iosOverlayGuide.style.position = 'absolute';
+            iosOverlayGuide.style.left = '50%';
+            iosOverlayGuide.style.top = '50%';
+            iosOverlayGuide.style.width = '72vw';
+            iosOverlayGuide.style.height = '72vw';
+            iosOverlayGuide.style.maxWidth = '320px';
+            iosOverlayGuide.style.maxHeight = '320px';
+            iosOverlayGuide.style.transform = 'translate(-50%, -50%)';
+            iosOverlayGuide.style.border = '6px solid rgba(255,255,255,0.92)';
+            iosOverlayGuide.style.borderRadius = '28px';
+            iosOverlayGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18)';
+            iosOverlayGuide.style.pointerEvents = 'none';
+            iosOverlayGuide.style.zIndex = '3';
 
             iosOverlayTitle = document.createElement('div');
             iosOverlayTitle.style.position = 'absolute';
@@ -437,13 +475,51 @@ define(['require'], function (require) {
             });
 
             iosOverlay.appendChild(iosOverlayCameraRoot);
-            iosOverlay.appendChild(scanGuide);
+            iosOverlay.appendChild(iosOverlayGuide);
             iosOverlay.appendChild(iosOverlayTitle);
             iosOverlay.appendChild(iosOverlayStopButton);
             document.body.appendChild(iosOverlay);
             bindIosPinchZoomListeners();
 
             return iosOverlay;
+        };
+
+        var setIosGuideState = function (state) {
+            if (!iosOverlayGuide) {
+                return;
+            }
+
+            if (state === 'success') {
+                iosOverlayGuide.style.borderColor = '#34c759';
+                iosOverlayGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18), 0 0 0 3px rgba(52,199,89,0.18)';
+                return;
+            }
+
+            iosOverlayGuide.style.borderColor = 'rgba(255,255,255,0.92)';
+            iosOverlayGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18)';
+        };
+
+        var stripIosHtml5QrcodeVisuals = function () {
+            if (!iosOverlayCameraRoot) {
+                return;
+            }
+
+            var scanRegion = document.getElementById(iosOverlayCameraRoot.id + '__scan_region');
+            if (!scanRegion) {
+                return;
+            }
+
+            scanRegion.style.background = 'transparent';
+            scanRegion.style.border = '0';
+            scanRegion.style.boxShadow = 'none';
+            scanRegion.style.outline = '0';
+
+            Array.prototype.forEach.call(scanRegion.querySelectorAll('div'), function (div) {
+                div.style.background = 'transparent';
+                div.style.border = '0';
+                div.style.boxShadow = 'none';
+                div.style.outline = '0';
+            });
         };
 
         var showIosOverlay = function () {
@@ -454,6 +530,7 @@ define(['require'], function (require) {
         var hideIosOverlay = function () {
             clearHtml5PatchTimers();
             resetIosPinchState();
+            setIosGuideState('idle');
 
             if (iosOverlayCameraRoot) {
                 iosOverlayCameraRoot.innerHTML = '';
@@ -513,6 +590,8 @@ define(['require'], function (require) {
                     div.style.height = '100%';
                 }
             });
+
+            stripIosHtml5QrcodeVisuals();
         };
 
         var scheduleIosHtml5Patches = function () {
@@ -686,13 +765,13 @@ define(['require'], function (require) {
 
         var getHtml5QrcodeConfig = function () {
             var config = {
-                fps: 10,
+                fps: 14,
                 rememberLastUsedCamera: false,
-                disableFlip: false
+                disableFlip: true
             };
 
             if (isAppleMobileDevice) {
-                config.fps = 12;
+                config.fps = 15;
                 config.qrbox = function (viewfinderWidth, viewfinderHeight) {
                     var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.62);
                     edge = Math.max(200, Math.min(320, edge));
@@ -738,6 +817,7 @@ define(['require'], function (require) {
 
                 isFinishingScan = true;
                 clearTimers();
+                setIosGuideState('success');
                 setMessage(messages.successDetected, false);
 
                 successDelayTimer = window.setTimeout(function () {
@@ -767,6 +847,7 @@ define(['require'], function (require) {
                 onScanFailure
             ).then(function () {
                 html5ScannerState = 'running';
+                setIosGuideState('idle');
                 patchIosHtml5Preview();
                 scheduleIosHtml5Patches();
                 resetIosPinchState();
@@ -1496,6 +1577,7 @@ define(['require'], function (require) {
             scanVideo.hidden = false;
             scanVideo.srcObject = sessionStream;
             scanModal.hidden = false;
+            bindScanModalPinchZoomListeners();
             isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
             window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
@@ -1516,6 +1598,15 @@ define(['require'], function (require) {
                     stopMediaStream(sessionStream);
                     return;
                 }
+
+                resetIosPinchState();
+                window.setTimeout(function () {
+                    if (sessionId !== openSessionId || !isScannerOpen) {
+                        return;
+                    }
+
+                    applyIosTrackZoomFactor(1);
+                }, 120);
             } catch (e) {
                 if (sessionId !== openSessionId) {
                     stopMediaStream(sessionStream);
