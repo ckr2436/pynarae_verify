@@ -958,6 +958,17 @@ define(['require'], function (require) {
             }
 
             codeInput.value = parsedResult.code;
+
+            var tsInput = form.querySelector('input[name="_ts"]');
+            if (!tsInput) {
+                tsInput = document.createElement('input');
+                tsInput.type = 'hidden';
+                tsInput.name = '_ts';
+                form.appendChild(tsInput);
+            }
+
+            tsInput.value = String(Date.now());
+
             setMessage(messages.successSubmitting, false);
             form.submit();
         };
