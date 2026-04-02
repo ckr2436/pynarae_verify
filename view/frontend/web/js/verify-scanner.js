@@ -21,10 +21,15 @@ define(['require'], function (require) {
         var confirmSubmit = scannerRoot.querySelector('[data-role="confirm-submit"]');
         var confirmCancel = scannerRoot.querySelector('[data-role="confirm-cancel"]');
         var resultPanel = document.querySelector('[data-role="verify-result"]');
+        var startSecondaryButton = scannerRoot.querySelector('[data-role="start-secondary-verification"]');
+        var submittedCode = (scannerRoot.getAttribute('data-submitted-code') || '').trim();
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
         var challengeCreateUrl = (scannerRoot.getAttribute('data-secondary-challenge-url') || '').trim();
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-secondary-verify-url') || '').trim();
         var secondaryTokenParamName = (scannerRoot.getAttribute('data-secondary-token-param') || '_svt').trim() || '_svt';
+        var currentLocationUrl = new URL(window.location.href);
+        var existingSecondaryToken = (currentLocationUrl.searchParams.get(secondaryTokenParamName) || '').trim();
+        var startSecondaryInProgress = false;
 
         if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop) {
             return;
@@ -1126,6 +1131,40 @@ define(['require'], function (require) {
             });
         };
 
+        var startSecondaryVerificationFlow = async function (code) {
+            var normalizedCode = String(code || '').trim();
+            if (!normalizedCode) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return;
+            }
+
+            if (startSecondaryInProgress) {
+                return;
+            }
+
+            startSecondaryInProgress = true;
+
+            if (startSecondaryButton) {
+                startSecondaryButton.disabled = true;
+            }
+
+            try {
+                var secondaryVerificationToken = await requestSecondVerification(normalizedCode);
+                if (!secondaryVerificationToken) {
+                    return;
+                }
+
+                setMessage(messages.successSubmitting, false);
+                window.location.assign(buildVerificationUrl(normalizedCode, secondaryVerificationToken));
+            } finally {
+                startSecondaryInProgress = false;
+
+                if (startSecondaryButton) {
+                    startSecondaryButton.disabled = false;
+                }
+            }
+        };
+
         var submitScannedCode = async function (qrValue, allowedHosts) {
             var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
             if (!parsedResult.isValid) {
@@ -1133,19 +1172,15 @@ define(['require'], function (require) {
                 return;
             }
 
-            var secondaryVerificationToken = await requestSecondVerification(parsedResult.code);
-            if (!secondaryVerificationToken) {
-                return;
-            }
-
-            setMessage(messages.successSubmitting, false);
-            window.location.assign(buildVerificationUrl(parsedResult.code, secondaryVerificationToken));
+            await startSecondaryVerificationFlow(parsedResult.code);
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-        if (!isMobile) {
+        if (submittedCode && !existingSecondaryToken) {
+            setMessage(messages.pendingVerification || messages.desktopGuide, false);
+        } else if (!isMobile) {
             setMessage(messages.desktopGuide, false);
         }
 
@@ -1835,6 +1870,12 @@ define(['require'], function (require) {
             closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
         });
+
+        if (startSecondaryButton) {
+            startSecondaryButton.addEventListener('click', async function () {
+                await startSecondaryVerificationFlow(submittedCode);
+            });
+        }
 
         window.addEventListener('popstate', function () {
             if (!isScannerOpen) {
