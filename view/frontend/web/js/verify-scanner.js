@@ -14,10 +14,9 @@ define(['require'], function (require) {
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
         var scanStop = scannerRoot.querySelector('[data-role="scan-stop"]');
         var resultPanel = document.querySelector('[data-role="verify-result"]');
-        var codeInput = document.querySelector('#verify-code');
-        var form = document.querySelector('.pynarae-verify__form');
+        var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
 
-        if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop || !codeInput || !form) {
+        if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop) {
             return;
         }
 
@@ -954,16 +953,19 @@ define(['require'], function (require) {
             return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
         };
 
-        var ensureRequestNonce = function () {
-            var tsInput = form.querySelector('input[name="_ts"]');
-            if (!tsInput) {
-                tsInput = document.createElement('input');
-                tsInput.type = 'hidden';
-                tsInput.name = '_ts';
-                form.appendChild(tsInput);
+        var buildVerificationUrl = function (code) {
+            var targetUrl;
+
+            try {
+                targetUrl = new URL(verifyUrl, window.location.origin);
+            } catch (e) {
+                targetUrl = new URL(window.location.href);
             }
 
-            tsInput.value = buildRequestNonce();
+            targetUrl.searchParams.set(codeParamName, code);
+            targetUrl.searchParams.set('_ts', buildRequestNonce());
+
+            return targetUrl.toString();
         };
 
         var submitScannedCode = function (qrValue, allowedHosts) {
@@ -973,10 +975,8 @@ define(['require'], function (require) {
                 return;
             }
 
-            codeInput.value = parsedResult.code;
-            ensureRequestNonce();
             setMessage(messages.successSubmitting, false);
-            form.submit();
+            window.location.assign(buildVerificationUrl(parsedResult.code));
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
@@ -986,9 +986,21 @@ define(['require'], function (require) {
             setMessage(messages.desktopGuide, false);
         }
 
-        form.addEventListener('submit', function () {
-            ensureRequestNonce();
-        });
+
+        var hasAnyVideoInput = async function () {
+            if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
+                return true;
+            }
+
+            try {
+                var devices = await navigator.mediaDevices.enumerateDevices();
+                return devices.some(function (device) {
+                    return device.kind === 'videoinput';
+                });
+            } catch (e) {
+                return true;
+            }
+        };
 
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             scanTrigger.hidden = true;
@@ -1285,7 +1297,7 @@ define(['require'], function (require) {
         var allowedHosts = [window.location.host];
 
         try {
-            var resolvedFormAction = new URL(form.getAttribute('action'), window.location.origin);
+            var resolvedFormAction = new URL(verifyUrl, window.location.origin);
             if (allowedHosts.indexOf(resolvedFormAction.host) === -1) {
                 allowedHosts.push(resolvedFormAction.host);
             }
@@ -1519,6 +1531,11 @@ define(['require'], function (require) {
 
             var sessionId = openSessionId;
             var sessionStream = null;
+
+            if (!(await hasAnyVideoInput())) {
+                setMessage(messages.noCameraApi, true);
+                return;
+            }
 
             if (isAppleMobileDevice) {
                 scanModal.hidden = true;

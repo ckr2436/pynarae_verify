@@ -25,33 +25,6 @@ body.pynarae-verify--scanner-open {
     color: #555;
 }
 
-.pynarae-verify__form {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: end;
-    margin-bottom: 24px;
-}
-
-.pynarae-verify__label {
-    grid-column: 1 / -1;
-    font-weight: 600;
-}
-
-.pynarae-verify__input {
-    min-height: 48px;
-    border-radius: 10px;
-    border: 1px solid #d7d7d7;
-    padding: 0 14px;
-    font-size: 15px;
-}
-
-.pynarae-verify__button {
-    min-height: 48px;
-    border-radius: 10px;
-    padding: 0 20px;
-}
-
 .pynarae-verify__scanner {
     margin: -8px 0 24px;
 }
@@ -171,8 +144,3 @@ body.pynarae-verify--scanner-open {
     width: 280px;
 }
 
-@media (max-width: 640px) {
-    .pynarae-verify__form {
-        grid-template-columns: 1fr;
-    }
-}
