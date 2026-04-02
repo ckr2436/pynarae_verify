@@ -904,16 +904,13 @@ define(['require'], function (require) {
         };
 
         var parseAndValidateScannedCode = function (rawValue, allowedHosts) {
-            var codeValue = parseScannedCode(rawValue);
-            if (!codeValue) {
-                return {
-                    isValid: false,
-                    errorMessage: messages.scanFailedRetry
-                };
-            }
-
             var scannedText = (rawValue || '').trim();
             var decodedText = scannedText;
+            var normalizedAllowedHosts = (allowedHosts || []).map(function (host) {
+                return String(host || '').toLowerCase();
+            }).filter(function (host) {
+                return host !== '';
+            });
 
             try {
                 decodedText = decodeURIComponent(scannedText);
@@ -923,30 +920,39 @@ define(['require'], function (require) {
 
             if (!/^https?:\/\//i.test(decodedText)) {
                 return {
-                    isValid: true,
-                    code: codeValue
+                    isValid: false,
+                    errorMessage: messages.invalidQrDomain
                 };
             }
 
             try {
                 var scannedUrl = new URL(decodedText);
-                if (allowedHosts.indexOf(scannedUrl.host) === -1) {
+                var scannedHost = String(scannedUrl.host || '').toLowerCase();
+                if (!scannedHost || normalizedAllowedHosts.indexOf(scannedHost) === -1) {
                     return {
                         isValid: false,
                         errorMessage: messages.invalidQrDomain
                     };
                 }
+
+                var codeValue = parseScannedCode(decodedText);
+                if (!codeValue) {
+                    return {
+                        isValid: false,
+                        errorMessage: messages.invalidQrDomain
+                    };
+                }
+
+                return {
+                    isValid: true,
+                    code: codeValue
+                };
             } catch (e) {
                 return {
                     isValid: false,
-                    errorMessage: messages.scanFailedRetry
+                    errorMessage: messages.invalidQrDomain
                 };
             }
-
-            return {
-                isValid: true,
-                code: codeValue
-            };
         };
 
         var buildRequestNonce = function () {
@@ -1294,12 +1300,13 @@ define(['require'], function (require) {
             }
         }
 
-        var allowedHosts = [window.location.host];
+        var allowedHosts = [String(window.location.host || '').toLowerCase()];
 
         try {
             var resolvedFormAction = new URL(verifyUrl, window.location.origin);
-            if (allowedHosts.indexOf(resolvedFormAction.host) === -1) {
-                allowedHosts.push(resolvedFormAction.host);
+            var verifyHost = String(resolvedFormAction.host || '').toLowerCase();
+            if (verifyHost && allowedHosts.indexOf(verifyHost) === -1) {
+                allowedHosts.push(verifyHost);
             }
         } catch (e) {
             // Ignore URL parsing failures and fall back to current host only.
