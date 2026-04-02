@@ -4,22 +4,28 @@ $result = $block->getVerificationResult();
 ?>
 <div class="pynarae-verify">
     <div class="pynarae-verify__card">
-        <h1 class="pynarae-verify__title"><?= $block->escapeHtml($block->getPageTitle()) ?></h1>
+        <h1 class="pynarae-verify__title"><?= $block->escapeHtml(__('Verify Product Authenticity')) ?></h1>
 
-        <?php if ($block->getIntroText()): ?>
-            <p class="pynarae-verify__intro"><?= $block->escapeHtml($block->getIntroText()) ?></p>
-        <?php endif; ?>
+        <p class="pynarae-verify__intro">
+            <?= $block->escapeHtml(__('Scan the authenticity QR code on your package to confirm that your product is genuine.')) ?>
+        </p>
 
         <?php if (!$block->isEnabled()): ?>
             <div class="pynarae-verify__result pynarae-verify__result--notice">
-                <?= $block->escapeHtml(__('Verification is currently unavailable. Please try again later.')) ?>
+                <?= $block->escapeHtml(__('Authenticity verification is currently unavailable. Please try again later.')) ?>
             </div>
         <?php else: ?>
-            <div class="pynarae-verify__scanner" data-role="qr-scanner" data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>" data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+            <div class="pynarae-verify__scanner"
+                 data-role="qr-scanner"
+                 data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
+                 data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+
                 <button class="action primary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
-                    <span><?= $block->escapeHtml(__('SCAN QR CODE')) ?></span>
+                    <span><?= $block->escapeHtml(__('SCAN AUTHENTICITY QR')) ?></span>
                 </button>
+
                 <p class="pynarae-verify__scanner-message" data-role="scan-message"></p>
+
                 <div class="pynarae-verify__scanner-modal" data-role="scan-modal" hidden>
                     <video class="pynarae-verify__video" data-role="scan-video" playsinline muted autoplay></video>
                     <div class="pynarae-verify__scan-mask" aria-hidden="true">
@@ -27,12 +33,11 @@ $result = $block->getVerificationResult();
                     </div>
                     <div class="pynarae-verify__scanner-toolbar">
                         <button class="action secondary pynarae-verify__stop-button" type="button" data-role="scan-stop">
-                            <span><?= $block->escapeHtml(__('Stop camera')) ?></span>
+                            <span><?= $block->escapeHtml(__('Stop Camera')) ?></span>
                         </button>
                     </div>
                 </div>
             </div>
-
 
             <?php if ($result): ?>
                 <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>" data-role="verify-result" tabindex="-1">
@@ -48,11 +53,9 @@ $result = $block->getVerificationResult();
                             <td><?= $block->escapeHtml($result['code'] ?? '') ?></td>
                         </tr>
                         <tr>
-                            <th><?= $block->escapeHtml(__('Validity')) ?></th>
-                            <td><?= !empty($result['matched']) ? $block->escapeHtml(__('Valid')) : $block->escapeHtml(__('Invalid')) ?></td>
+                            <th><?= $block->escapeHtml(__('Authenticity Status')) ?></th>
+                            <td><?= !empty($result['matched']) ? $block->escapeHtml(__('Verified')) : $block->escapeHtml(__('Unable to Verify')) ?></td>
                         </tr>
-
-
 
                         <?php if (!empty($result['product_name'])): ?>
                             <tr>
@@ -77,21 +80,21 @@ $result = $block->getVerificationResult();
 
                         <?php if ($block->shouldShowScanCount() && isset($result['scan_count'])): ?>
                             <tr>
-                                <th><?= $block->escapeHtml(__('Verification Count')) ?></th>
+                                <th><?= $block->escapeHtml(__('Total Successful Verifications')) ?></th>
                                 <td><?= (int)$result['scan_count'] ?></td>
                             </tr>
                         <?php endif; ?>
 
                         <?php if (!empty($result['first_scanned_at'])): ?>
                             <tr>
-                                <th><?= $block->escapeHtml(__('First Successful Verification')) ?></th>
+                                <th><?= $block->escapeHtml(__('First Verified')) ?></th>
                                 <td><?= $block->escapeHtml($result['first_scanned_at']) ?></td>
                             </tr>
                         <?php endif; ?>
 
                         <?php if (!empty($result['last_scanned_at'])): ?>
                             <tr>
-                                <th><?= $block->escapeHtml(__('Last Successful Verification')) ?></th>
+                                <th><?= $block->escapeHtml(__('Last Verified')) ?></th>
                                 <td><?= $block->escapeHtml($result['last_scanned_at']) ?></td>
                             </tr>
                         <?php endif; ?>
@@ -103,25 +106,24 @@ $result = $block->getVerificationResult();
     </div>
 </div>
 
-
 <script type="text/x-magento-init">
 {
     "[data-role=\"qr-scanner\"]": {
         "Pynarae_Verify/js/verify-scanner": {
             "rootSelector": "[data-role=\"qr-scanner\"]",
             "messages": {
-                "desktopGuide": "<?= $block->escapeJsQuote(__('Please use your phone to scan: scan the product QR code with your phone camera, then open the verification page.'), '"') ?>",
-                "noCameraApi": "<?= $block->escapeJsQuote(__('This device cannot access a camera. Please use a mobile device to scan the product QR code.'), '"') ?>",
-                "loadingFallback": "<?= $block->escapeJsQuote(__('Preparing QR scanner compatibility mode for this browser...'), '"') ?>",
-                "noFallbackScanner": "<?= $block->escapeJsQuote(__('Unable to initialize QR scanning on this device. Please use a mobile device to scan the product QR code.'), '"') ?>",
-                "cameraDenied": "<?= $block->escapeJsQuote(__('Camera access is unavailable. Please use a mobile device to scan the product QR code.'), '"') ?>",
-                "scanning": "<?= $block->escapeJsQuote(__('Align the QR code within the camera frame. The scanner will close automatically after a successful scan.'), '"') ?>",
-                "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start the camera preview. Please use a mobile device to scan the product QR code.'), '"') ?>",
-                "successDetected": "<?= $block->escapeJsQuote(__('QR code detected successfully. Preparing verification...'), '"') ?>",
-                "successSubmitting": "<?= $block->escapeJsQuote(__('Verification in progress...'), '"') ?>",
-                "keepFocus": "<?= $block->escapeJsQuote(__('Scanning... keep the camera steady and in focus.'), '"') ?>",
-                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Verification failed, please try again.'), '"') ?>",
-                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the correct anti-counterfeit QR code. You can find it on the outer packaging.'), '"') ?>"
+                "desktopGuide": "<?= $block->escapeJsQuote(__('Use your mobile phone camera to scan the authenticity QR code on the product package.'), '"') ?>",
+                "noCameraApi": "<?= $block->escapeJsQuote(__('This device cannot access a camera. Please open this page on a mobile phone and scan the authenticity QR code.'), '"') ?>",
+                "loadingFallback": "<?= $block->escapeJsQuote(__('Preparing the QR scanner...'), '"') ?>",
+                "noFallbackScanner": "<?= $block->escapeJsQuote(__('Unable to initialize the QR scanner on this device. Please use a mobile phone camera instead.'), '"') ?>",
+                "cameraDenied": "<?= $block->escapeJsQuote(__('Camera access is unavailable. Please allow camera access or use another mobile device to scan the authenticity QR code.'), '"') ?>",
+                "scanning": "<?= $block->escapeJsQuote(__('Align the authenticity QR code within the frame. Verification will continue automatically after a successful scan.'), '"') ?>",
+                "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start the camera preview. Please try again or use another mobile device.'), '"') ?>",
+                "successDetected": "<?= $block->escapeJsQuote(__('QR code detected. Verifying now...'), '"') ?>",
+                "successSubmitting": "<?= $block->escapeJsQuote(__('Authenticity verification in progress...'), '"') ?>",
+                "keepFocus": "<?= $block->escapeJsQuote(__('Hold the camera steady and keep the QR code in focus.'), '"') ?>",
+                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Please try again.'), '"') ?>",
+                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '"') ?>"
             }
         }
     }

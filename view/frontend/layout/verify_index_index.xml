@@ -8,6 +8,8 @@
         <css src="Pynarae_Verify::css/verify.css"/>
     </head>
     <body>
+        <referenceBlock name="page.main.title" remove="true"/>
+
         <referenceContainer name="content">
             <block class="Pynarae\Verify\Block\Verify"
                    name="pynarae.verify.page"
