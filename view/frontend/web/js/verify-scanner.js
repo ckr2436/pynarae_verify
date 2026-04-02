@@ -57,6 +57,7 @@ define(['require'], function (require) {
         var openSessionId = 0;
         var messages = config.messages || {};
         var startSecondaryInProgress = false;
+        var hasAutoStartedSecondaryVerification = false;
 
         var detector = null;
         var activeFallback = null;
@@ -1060,7 +1061,8 @@ define(['require'], function (require) {
 
             return new Promise(function (resolve) {
                 confirmGuide.textContent = messages.secondVerifyPrompt || '';
-                confirmCode.textContent = challenge.challengeCode;
+                confirmCode.textContent = String(challenge.challengeCode || '');
+                confirmCode.hidden = false;
                 confirmInput.value = '';
                 confirmError.textContent = '';
                 confirmError.hidden = true;
@@ -1277,11 +1279,24 @@ define(['require'], function (require) {
             await startSecondaryVerificationFlow(parsedResult.code);
         };
 
+        var autoStartSecondaryVerificationIfNeeded = function () {
+            if (!submittedCode || hasAutoStartedSecondaryVerification) {
+                return;
+            }
+
+            hasAutoStartedSecondaryVerification = true;
+
+            window.setTimeout(function () {
+                startSecondaryVerificationFlow(submittedCode);
+            }, 150);
+        };
+
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
         if (submittedCode) {
-            setMessage(messages.pendingVerification || messages.desktopGuide, false);
+            setMessage(messages.pendingVerification || '', false);
+            autoStartSecondaryVerificationIfNeeded();
         } else if (!isMobile) {
             setMessage(messages.desktopGuide, false);
         }
