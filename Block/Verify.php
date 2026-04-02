@@ -61,6 +61,21 @@ class Verify extends Template
         return $value;
     }
 
+    public function hasSubmittedCode(): bool
+    {
+        return $this->getSubmittedCode() !== '';
+    }
+
+    public function hasSecondaryVerificationToken(): bool
+    {
+        return trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, '')) !== '';
+    }
+
+    public function needsSecondaryVerification(): bool
+    {
+        return $this->hasSubmittedCode() && !$this->hasSecondaryVerificationToken();
+    }
+
     public function getCodeParam(): string
     {
         return $this->config->getQrCodeParam();
@@ -79,15 +94,20 @@ class Verify extends Template
             return null;
         }
 
-        $verificationToken = trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, ''));
-        if (
-            $verificationToken === ''
-            || !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)
-        ) {
+        $verificationToken = trim((string)$this->request->getParam(
+            SecondaryVerificationManager::TOKEN_PARAM,
+            ''
+        ));
+
+        if ($verificationToken === '') {
+            return null;
+        }
+
+        if (!$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
             $this->verificationResult = [
                 'status' => 'error',
                 'title' => (string)__('Verification blocked'),
-                'message' => (string)__('Secondary verification is required and may have expired. Please scan and verify again.'),
+                'message' => (string)__('Secondary verification is invalid or expired. Please try again.'),
                 'code' => $code,
                 'matched' => false,
             ];
