@@ -80,7 +80,7 @@ class Verify extends Template
         }
 
         $verificationToken = trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, ''));
-        if ($verificationToken === '' || !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
+        if ($verificationToken !== '' && !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
             $this->verificationResult = [
                 'status' => 'error',
                 'title' => (string)__('Verification blocked'),
