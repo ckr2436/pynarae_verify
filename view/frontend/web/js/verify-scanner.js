@@ -13,6 +13,13 @@ define(['require'], function (require) {
         var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
         var scanStop = scannerRoot.querySelector('[data-role="scan-stop"]');
+        var confirmModal = scannerRoot.querySelector('[data-role="confirm-modal"]');
+        var confirmGuide = scannerRoot.querySelector('[data-role="confirm-guide"]');
+        var confirmCode = scannerRoot.querySelector('[data-role="confirm-code"]');
+        var confirmInput = scannerRoot.querySelector('[data-role="confirm-input"]');
+        var confirmError = scannerRoot.querySelector('[data-role="confirm-error"]');
+        var confirmSubmit = scannerRoot.querySelector('[data-role="confirm-submit"]');
+        var confirmCancel = scannerRoot.querySelector('[data-role="confirm-cancel"]');
         var resultPanel = document.querySelector('[data-role="verify-result"]');
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
 
@@ -974,10 +981,80 @@ define(['require'], function (require) {
             return targetUrl.toString();
         };
 
-        var submitScannedCode = function (qrValue, allowedHosts) {
+        var generateSecondVerifyCode = function () {
+            return String(Math.floor(100000 + Math.random() * 900000));
+        };
+
+        var requestSecondVerification = function () {
+            if (
+                !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
+                !confirmError || !confirmSubmit || !confirmCancel
+            ) {
+                return Promise.resolve(true);
+            }
+
+            return new Promise(function (resolve) {
+                var expectedCode = generateSecondVerifyCode();
+
+                confirmGuide.textContent = messages.secondVerifyPrompt || '';
+                confirmCode.textContent = expectedCode;
+                confirmInput.value = '';
+                confirmError.textContent = '';
+                confirmError.hidden = true;
+                confirmModal.hidden = false;
+
+                var cleanup = function () {
+                    confirmSubmit.removeEventListener('click', onSubmit);
+                    confirmCancel.removeEventListener('click', onCancel);
+                    confirmInput.removeEventListener('keydown', onInputKeyDown);
+                    confirmModal.hidden = true;
+                };
+
+                var onCancel = function () {
+                    cleanup();
+                    setMessage(messages.secondVerifyCancelled || messages.scanFailedRetry, true);
+                    resolve(false);
+                };
+
+                var onSubmit = function () {
+                    var value = String(confirmInput.value || '').trim();
+                    if (value !== expectedCode) {
+                        confirmError.textContent = messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
+                        return;
+                    }
+
+                    cleanup();
+                    resolve(true);
+                };
+
+                var onInputKeyDown = function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        onSubmit();
+                    } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onCancel();
+                    }
+                };
+
+                confirmSubmit.addEventListener('click', onSubmit);
+                confirmCancel.addEventListener('click', onCancel);
+                confirmInput.addEventListener('keydown', onInputKeyDown);
+                confirmInput.focus();
+            });
+        };
+
+        var submitScannedCode = async function (qrValue, allowedHosts) {
             var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
             if (!parsedResult.isValid) {
                 setMessage(parsedResult.errorMessage, true);
+                return;
+            }
+
+            var secondVerifyPassed = await requestSecondVerification();
+            if (!secondVerifyPassed) {
                 return;
             }
 
