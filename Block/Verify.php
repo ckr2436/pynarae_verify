@@ -80,11 +80,11 @@ class Verify extends Template
         }
 
         $verificationToken = trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, ''));
-        if ($verificationToken !== '' && !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
+        if ($verificationToken === '' || !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
             $this->verificationResult = [
                 'status' => 'error',
                 'title' => (string)__('Verification blocked'),
-                'message' => (string)__('Secondary verification failed or expired. Please scan and verify again.'),
+                'message' => (string)__('Secondary verification is required and may have expired. Please scan and verify again.'),
                 'code' => $code,
                 'matched' => false,
             ];
