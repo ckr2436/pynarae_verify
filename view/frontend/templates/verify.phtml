@@ -18,7 +18,10 @@ $result = $block->getVerificationResult();
             <div class="pynarae-verify__scanner"
                  data-role="qr-scanner"
                  data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
-                 data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+                 data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>"
+                 data-secondary-challenge-url="<?= $block->escapeUrl($block->getChallengeCreateUrl()) ?>"
+                 data-secondary-verify-url="<?= $block->escapeUrl($block->getChallengeVerifyUrl()) ?>"
+                 data-secondary-token-param="<?= $block->escapeHtmlAttr(\Pynarae\Verify\Model\SecondaryVerificationManager::TOKEN_PARAM) ?>">
 
                 <button class="action primary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
                     <span><?= $block->escapeHtml(__('SCAN AUTHENTICITY QR')) ?></span>

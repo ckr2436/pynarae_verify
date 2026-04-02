@@ -22,6 +22,9 @@ define(['require'], function (require) {
         var confirmCancel = scannerRoot.querySelector('[data-role="confirm-cancel"]');
         var resultPanel = document.querySelector('[data-role="verify-result"]');
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
+        var challengeCreateUrl = (scannerRoot.getAttribute('data-secondary-challenge-url') || '').trim();
+        var challengeVerifyUrl = (scannerRoot.getAttribute('data-secondary-verify-url') || '').trim();
+        var secondaryTokenParamName = (scannerRoot.getAttribute('data-secondary-token-param') || '_svt').trim() || '_svt';
 
         if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop) {
             return;
@@ -966,7 +969,7 @@ define(['require'], function (require) {
             return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
         };
 
-        var buildVerificationUrl = function (code) {
+        var buildVerificationUrl = function (code, verificationToken) {
             var targetUrl;
 
             try {
@@ -976,29 +979,96 @@ define(['require'], function (require) {
             }
 
             targetUrl.searchParams.set(codeParamName, code);
+            targetUrl.searchParams.set(secondaryTokenParamName, verificationToken);
             targetUrl.searchParams.set('_ts', buildRequestNonce());
 
             return targetUrl.toString();
         };
 
-        var generateSecondVerifyCode = function () {
-            return String(Math.floor(100000 + Math.random() * 900000));
+        var requestServerChallenge = async function () {
+            if (!challengeCreateUrl) {
+                return null;
+            }
+
+            try {
+                var response = await fetch(challengeCreateUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                var data = await response.json();
+                if (!data || data.success !== true || !data.challenge_id || !data.challenge_code) {
+                    return null;
+                }
+
+                return {
+                    challengeId: String(data.challenge_id),
+                    challengeCode: String(data.challenge_code)
+                };
+            } catch (e) {
+                return null;
+            }
         };
 
-        var requestSecondVerification = function () {
+        var verifyServerChallenge = async function (challengeId, challengeCode, scannedCode) {
+            if (!challengeVerifyUrl || !challengeId || !challengeCode || !scannedCode) {
+                return null;
+            }
+
+            try {
+                var verifyUrlObject = new URL(challengeVerifyUrl, window.location.origin);
+                verifyUrlObject.searchParams.set('challenge_id', challengeId);
+                verifyUrlObject.searchParams.set('challenge_code', challengeCode);
+                verifyUrlObject.searchParams.set('verification_code', scannedCode);
+
+                var response = await fetch(verifyUrlObject.toString(), {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                var data = await response.json();
+                if (!data || data.success !== true || !data.token) {
+                    return null;
+                }
+
+                return String(data.token);
+            } catch (e) {
+                return null;
+            }
+        };
+
+        var requestSecondVerification = async function (scannedCode) {
             if (
                 !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
                 !confirmError || !confirmSubmit || !confirmCancel
             ) {
                 setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
-                return Promise.resolve(false);
+                return null;
+            }
+
+            var challenge = await requestServerChallenge();
+            if (!challenge) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return null;
             }
 
             return new Promise(function (resolve) {
-                var expectedCode = generateSecondVerifyCode();
-
                 confirmGuide.textContent = messages.secondVerifyPrompt || '';
-                confirmCode.textContent = expectedCode;
+                confirmCode.textContent = challenge.challengeCode;
                 confirmInput.value = '';
                 confirmError.textContent = '';
                 confirmError.hidden = true;
@@ -1014,12 +1084,21 @@ define(['require'], function (require) {
                 var onCancel = function () {
                     cleanup();
                     setMessage(messages.secondVerifyCancelled || messages.scanFailedRetry, true);
-                    resolve(false);
+                    resolve(null);
                 };
 
-                var onSubmit = function () {
+                var onSubmit = async function () {
                     var value = String(confirmInput.value || '').trim();
-                    if (value !== expectedCode) {
+
+                    if (value === '') {
+                        confirmError.textContent = messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
+                        return;
+                    }
+
+                    var token = await verifyServerChallenge(challenge.challengeId, value, scannedCode);
+                    if (!token) {
                         confirmError.textContent = messages.secondVerifyInvalid || '';
                         confirmError.hidden = false;
                         confirmInput.focus();
@@ -1027,7 +1106,7 @@ define(['require'], function (require) {
                     }
 
                     cleanup();
-                    resolve(true);
+                    resolve(token);
                 };
 
                 var onInputKeyDown = function (event) {
@@ -1054,13 +1133,13 @@ define(['require'], function (require) {
                 return;
             }
 
-            var secondVerifyPassed = await requestSecondVerification();
-            if (!secondVerifyPassed) {
+            var secondaryVerificationToken = await requestSecondVerification(parsedResult.code);
+            if (!secondaryVerificationToken) {
                 return;
             }
 
             setMessage(messages.successSubmitting, false);
-            window.location.assign(buildVerificationUrl(parsedResult.code));
+            window.location.assign(buildVerificationUrl(parsedResult.code, secondaryVerificationToken));
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
