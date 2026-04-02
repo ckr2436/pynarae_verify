@@ -11,7 +11,7 @@ $introText = trim($block->getIntroText());
             <?php if ($introText !== ''): ?>
                 <?= $block->escapeHtml($introText) ?>
             <?php else: ?>
-                <?= $block->escapeHtml(__('Scan the authenticity QR code on your package to confirm that your product is genuine.')) ?>
+                <?= $block->escapeHtml(__('Use your mobile phone to scan the official authenticity QR code on your package. If you opened this page from a package QR code, complete the secondary verification to continue.')) ?>
             <?php endif; ?>
         </p>
 
@@ -140,7 +140,7 @@ $introText = trim($block->getIntroText());
                 "keepFocus": "<?= $block->escapeJsQuote(__('Hold the camera steady and keep the QR code in focus.'), '\"') ?>",
                 "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Please try again.'), '\"') ?>",
                 "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '\"') ?>",
-                "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('You are performing a product authenticity check. Please enter the system verification code shown below to continue.'), '\"') ?>",
+                "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('Please enter the verification code shown below to confirm that you are intentionally performing an authenticity check.'), '\"') ?>",
                 "secondVerifyInvalid": "<?= $block->escapeJsQuote(__('The verification code you entered is incorrect. Please try again.'), '\"') ?>",
                 "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '\"') ?>",
                 "secondVerifyUnavailable": "<?= $block->escapeJsQuote(__('Secondary verification is currently unavailable. Please refresh and try again.'), '\"') ?>",
