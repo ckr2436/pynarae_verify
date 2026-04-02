@@ -990,7 +990,8 @@ define(['require'], function (require) {
                 !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
                 !confirmError || !confirmSubmit || !confirmCancel
             ) {
-                return Promise.resolve(true);
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return Promise.resolve(false);
             }
 
             return new Promise(function (resolve) {

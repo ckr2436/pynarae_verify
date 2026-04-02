@@ -149,7 +149,8 @@ $result = $block->getVerificationResult();
                 "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '"') ?>",
                 "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('You are performing a product authenticity check. Please enter the system verification code shown below to continue.'), '"') ?>",
                 "secondVerifyInvalid": "<?= $block->escapeJsQuote(__('The verification code you entered is incorrect. Please try again.'), '"') ?>",
-                "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '"') ?>"
+                "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '"') ?>",
+                "secondVerifyUnavailable": "<?= $block->escapeJsQuote(__('Secondary verification is currently unavailable. Please refresh and try again.'), '"') ?>"
             }
         }
     }
