@@ -1185,6 +1185,13 @@ define(['require'], function (require) {
         }
 
 
+
+        if (startSecondaryButton) {
+            startSecondaryButton.addEventListener('click', async function () {
+                await startSecondaryVerificationFlow(submittedCode);
+            });
+        }
+
         var hasAnyVideoInput = async function () {
             if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
                 return true;
@@ -1202,7 +1209,11 @@ define(['require'], function (require) {
 
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             scanTrigger.hidden = true;
-            setMessage(messages.noCameraApi, true);
+
+            if (!(submittedCode && !existingSecondaryToken)) {
+                setMessage(messages.noCameraApi, true);
+            }
+
             return;
         }
 
@@ -1870,13 +1881,6 @@ define(['require'], function (require) {
             closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
         });
-
-        if (startSecondaryButton) {
-            startSecondaryButton.addEventListener('click', async function () {
-                await startSecondaryVerificationFlow(submittedCode);
-            });
-        }
-
         window.addEventListener('popstate', function () {
             if (!isScannerOpen) {
                 return;
