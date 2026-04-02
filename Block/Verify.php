@@ -9,6 +9,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Pynarae\Verify\Model\Config;
+use Pynarae\Verify\Model\SecondaryVerificationManager;
 use Pynarae\Verify\Model\VerificationService;
 
 class Verify extends Template
@@ -21,6 +22,7 @@ class Verify extends Template
         Context $context,
         private Config $config,
         private RequestInterface $request,
+        private SecondaryVerificationManager $secondaryVerificationManager,
         private VerificationService $verificationService,
         array $data = []
     ) {
@@ -77,6 +79,22 @@ class Verify extends Template
             return null;
         }
 
+        $verificationToken = trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, ''));
+        if (
+            $verificationToken === ''
+            || !$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)
+        ) {
+            $this->verificationResult = [
+                'status' => 'error',
+                'title' => (string)__('Verification blocked'),
+                'message' => (string)__('Secondary verification is required and may have expired. Please scan and verify again.'),
+                'code' => $code,
+                'matched' => false,
+            ];
+
+            return $this->verificationResult;
+        }
+
         try {
             $this->verificationResult = $this->verificationService->verify($code);
         } catch (LocalizedException $e) {
@@ -103,6 +121,16 @@ class Verify extends Template
     public function getVerifyUrl(): string
     {
         return $this->getUrl('verify');
+    }
+
+    public function getChallengeCreateUrl(): string
+    {
+        return $this->getUrl('verify/challenge/create');
+    }
+
+    public function getChallengeVerifyUrl(): string
+    {
+        return $this->getUrl('verify/challenge/verify');
     }
 
     public function getRequestNonce(): string

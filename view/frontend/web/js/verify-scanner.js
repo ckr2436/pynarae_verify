@@ -13,8 +13,18 @@ define(['require'], function (require) {
         var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
         var scanStop = scannerRoot.querySelector('[data-role="scan-stop"]');
+        var confirmModal = scannerRoot.querySelector('[data-role="confirm-modal"]');
+        var confirmGuide = scannerRoot.querySelector('[data-role="confirm-guide"]');
+        var confirmCode = scannerRoot.querySelector('[data-role="confirm-code"]');
+        var confirmInput = scannerRoot.querySelector('[data-role="confirm-input"]');
+        var confirmError = scannerRoot.querySelector('[data-role="confirm-error"]');
+        var confirmSubmit = scannerRoot.querySelector('[data-role="confirm-submit"]');
+        var confirmCancel = scannerRoot.querySelector('[data-role="confirm-cancel"]');
         var resultPanel = document.querySelector('[data-role="verify-result"]');
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
+        var challengeCreateUrl = (scannerRoot.getAttribute('data-secondary-challenge-url') || '').trim();
+        var challengeVerifyUrl = (scannerRoot.getAttribute('data-secondary-verify-url') || '').trim();
+        var secondaryTokenParamName = (scannerRoot.getAttribute('data-secondary-token-param') || '_svt').trim() || '_svt';
 
         if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop) {
             return;
@@ -959,7 +969,7 @@ define(['require'], function (require) {
             return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
         };
 
-        var buildVerificationUrl = function (code) {
+        var buildVerificationUrl = function (code, verificationToken) {
             var targetUrl;
 
             try {
@@ -969,20 +979,167 @@ define(['require'], function (require) {
             }
 
             targetUrl.searchParams.set(codeParamName, code);
+            targetUrl.searchParams.set(secondaryTokenParamName, verificationToken);
             targetUrl.searchParams.set('_ts', buildRequestNonce());
 
             return targetUrl.toString();
         };
 
-        var submitScannedCode = function (qrValue, allowedHosts) {
+        var requestServerChallenge = async function () {
+            if (!challengeCreateUrl) {
+                return null;
+            }
+
+            try {
+                var response = await fetch(challengeCreateUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                var data = await response.json();
+                if (!data || data.success !== true || !data.challenge_id || !data.challenge_code) {
+                    return null;
+                }
+
+                return {
+                    challengeId: String(data.challenge_id),
+                    challengeCode: String(data.challenge_code)
+                };
+            } catch (e) {
+                return null;
+            }
+        };
+
+        var verifyServerChallenge = async function (challengeId, challengeCode, scannedCode) {
+            if (!challengeVerifyUrl || !challengeId || !challengeCode || !scannedCode) {
+                return null;
+            }
+
+            try {
+                var verifyUrlObject = new URL(challengeVerifyUrl, window.location.origin);
+                verifyUrlObject.searchParams.set('challenge_id', challengeId);
+                verifyUrlObject.searchParams.set('challenge_code', challengeCode);
+                verifyUrlObject.searchParams.set('verification_code', scannedCode);
+
+                var response = await fetch(verifyUrlObject.toString(), {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                var data = await response.json();
+                if (!data || data.success !== true || !data.token) {
+                    return null;
+                }
+
+                return String(data.token);
+            } catch (e) {
+                return null;
+            }
+        };
+
+        var requestSecondVerification = async function (scannedCode) {
+            if (
+                !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
+                !confirmError || !confirmSubmit || !confirmCancel
+            ) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return null;
+            }
+
+            var challenge = await requestServerChallenge();
+            if (!challenge) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return null;
+            }
+
+            return new Promise(function (resolve) {
+                confirmGuide.textContent = messages.secondVerifyPrompt || '';
+                confirmCode.textContent = challenge.challengeCode;
+                confirmInput.value = '';
+                confirmError.textContent = '';
+                confirmError.hidden = true;
+                confirmModal.hidden = false;
+
+                var cleanup = function () {
+                    confirmSubmit.removeEventListener('click', onSubmit);
+                    confirmCancel.removeEventListener('click', onCancel);
+                    confirmInput.removeEventListener('keydown', onInputKeyDown);
+                    confirmModal.hidden = true;
+                };
+
+                var onCancel = function () {
+                    cleanup();
+                    setMessage(messages.secondVerifyCancelled || messages.scanFailedRetry, true);
+                    resolve(null);
+                };
+
+                var onSubmit = async function () {
+                    var value = String(confirmInput.value || '').trim();
+
+                    if (value === '') {
+                        confirmError.textContent = messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
+                        return;
+                    }
+
+                    var token = await verifyServerChallenge(challenge.challengeId, value, scannedCode);
+                    if (!token) {
+                        confirmError.textContent = messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
+                        return;
+                    }
+
+                    cleanup();
+                    resolve(token);
+                };
+
+                var onInputKeyDown = function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        onSubmit();
+                    } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onCancel();
+                    }
+                };
+
+                confirmSubmit.addEventListener('click', onSubmit);
+                confirmCancel.addEventListener('click', onCancel);
+                confirmInput.addEventListener('keydown', onInputKeyDown);
+                confirmInput.focus();
+            });
+        };
+
+        var submitScannedCode = async function (qrValue, allowedHosts) {
             var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
             if (!parsedResult.isValid) {
                 setMessage(parsedResult.errorMessage, true);
                 return;
             }
 
+            var secondaryVerificationToken = await requestSecondVerification(parsedResult.code);
+            if (!secondaryVerificationToken) {
+                return;
+            }
+
             setMessage(messages.successSubmitting, false);
-            window.location.assign(buildVerificationUrl(parsedResult.code));
+            window.location.assign(buildVerificationUrl(parsedResult.code, secondaryVerificationToken));
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||

@@ -18,7 +18,10 @@ $result = $block->getVerificationResult();
             <div class="pynarae-verify__scanner"
                  data-role="qr-scanner"
                  data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
-                 data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>">
+                 data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>"
+                 data-secondary-challenge-url="<?= $block->escapeUrl($block->getChallengeCreateUrl()) ?>"
+                 data-secondary-verify-url="<?= $block->escapeUrl($block->getChallengeVerifyUrl()) ?>"
+                 data-secondary-token-param="<?= $block->escapeHtmlAttr(\Pynarae\Verify\Model\SecondaryVerificationManager::TOKEN_PARAM) ?>">
 
                 <button class="action primary pynarae-verify__scan-button" type="button" data-role="scan-trigger">
                     <span><?= $block->escapeHtml(__('SCAN AUTHENTICITY QR')) ?></span>
@@ -35,6 +38,29 @@ $result = $block->getVerificationResult();
                         <button class="action secondary pynarae-verify__stop-button" type="button" data-role="scan-stop">
                             <span><?= $block->escapeHtml(__('Stop Camera')) ?></span>
                         </button>
+                    </div>
+                </div>
+
+                <div class="pynarae-verify__confirm-modal" data-role="confirm-modal" hidden>
+                    <div class="pynarae-verify__confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="pynarae-verify-confirm-title">
+                        <h2 class="pynarae-verify__confirm-title" id="pynarae-verify-confirm-title">
+                            <?= $block->escapeHtml(__('Secondary verification')) ?>
+                        </h2>
+                        <p class="pynarae-verify__confirm-text" data-role="confirm-guide"></p>
+                        <p class="pynarae-verify__confirm-code" data-role="confirm-code"></p>
+                        <label class="pynarae-verify__confirm-label" for="pynarae-verify-confirm-input">
+                            <?= $block->escapeHtml(__('Enter verification code')) ?>
+                        </label>
+                        <input id="pynarae-verify-confirm-input" type="text" data-role="confirm-input" autocomplete="off"/>
+                        <p class="pynarae-verify__confirm-error" data-role="confirm-error" hidden></p>
+                        <div class="pynarae-verify__confirm-actions">
+                            <button class="action primary" type="button" data-role="confirm-submit">
+                                <span><?= $block->escapeHtml(__('Verify')) ?></span>
+                            </button>
+                            <button class="action secondary" type="button" data-role="confirm-cancel">
+                                <span><?= $block->escapeHtml(__('Cancel')) ?></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -123,7 +149,11 @@ $result = $block->getVerificationResult();
                 "successSubmitting": "<?= $block->escapeJsQuote(__('Authenticity verification in progress...'), '"') ?>",
                 "keepFocus": "<?= $block->escapeJsQuote(__('Hold the camera steady and keep the QR code in focus.'), '"') ?>",
                 "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Please try again.'), '"') ?>",
-                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '"') ?>"
+                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '"') ?>",
+                "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('You are performing a product authenticity check. Please enter the system verification code shown below to continue.'), '"') ?>",
+                "secondVerifyInvalid": "<?= $block->escapeJsQuote(__('The verification code you entered is incorrect. Please try again.'), '"') ?>",
+                "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '"') ?>",
+                "secondVerifyUnavailable": "<?= $block->escapeJsQuote(__('Secondary verification is currently unavailable. Please refresh and try again.'), '"') ?>"
             }
         }
     }
