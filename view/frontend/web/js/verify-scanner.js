@@ -32,6 +32,12 @@ define(['require'], function (require) {
 
         var codeParamName = (scannerRoot.getAttribute('data-code-param') || 'code').trim() || 'code';
         var submittedCode = (scannerRoot.getAttribute('data-submitted-code') || '').trim();
+        var currentUrl = new URL(window.location.href);
+        var codeFromUrl = (
+            currentUrl.searchParams.get(codeParamName) ||
+            currentUrl.searchParams.get('code') ||
+            ''
+        ).trim();
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
         var challengeCreateUrl = (scannerRoot.getAttribute('data-challenge-create-url') || '').trim();
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
@@ -946,7 +952,12 @@ define(['require'], function (require) {
                     form_key: formKey
                 });
 
-                if (!response.data || response.data.success !== true) {
+                if (
+                    !response.data ||
+                    response.data.success !== true ||
+                    !response.data.challenge_id ||
+                    !response.data.challenge_code
+                ) {
                     return {
                         success: false,
                         code: response.data && response.data.code ? response.data.code : 'challenge_unavailable',
@@ -1061,8 +1072,8 @@ define(['require'], function (require) {
 
             return new Promise(function (resolve) {
                 confirmGuide.textContent = messages.secondVerifyPrompt || '';
-                confirmCode.textContent = String(challenge.challengeCode || '');
-                confirmCode.hidden = false;
+                confirmCode.textContent = String(challenge.challengeCode || '').trim();
+                confirmCode.hidden = confirmCode.textContent === '';
                 confirmInput.value = '';
                 confirmError.textContent = '';
                 confirmError.hidden = true;
@@ -1072,6 +1083,12 @@ define(['require'], function (require) {
                     confirmSubmit.removeEventListener('click', onSubmit);
                     confirmCancel.removeEventListener('click', onCancel);
                     confirmInput.removeEventListener('keydown', onInputKeyDown);
+                    confirmInput.value = '';
+                    confirmError.textContent = '';
+                    confirmError.hidden = true;
+                    confirmGuide.textContent = '';
+                    confirmCode.textContent = '';
+                    confirmCode.hidden = true;
                     confirmModal.hidden = true;
                 };
 
@@ -1280,21 +1297,21 @@ define(['require'], function (require) {
         };
 
         var autoStartSecondaryVerificationIfNeeded = function () {
-            if (!submittedCode || hasAutoStartedSecondaryVerification) {
+            if (!codeFromUrl || hasAutoStartedSecondaryVerification) {
                 return;
             }
 
             hasAutoStartedSecondaryVerification = true;
 
             window.setTimeout(function () {
-                startSecondaryVerificationFlow(submittedCode);
+                startSecondaryVerificationFlow(codeFromUrl);
             }, 150);
         };
 
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-        if (submittedCode) {
+        if (codeFromUrl) {
             setMessage(messages.pendingVerification || '', false);
             autoStartSecondaryVerificationIfNeeded();
         } else if (!isMobile) {
@@ -1303,7 +1320,7 @@ define(['require'], function (require) {
 
         if (startSecondaryButton) {
             startSecondaryButton.addEventListener('click', async function () {
-                await startSecondaryVerificationFlow(submittedCode);
+                await startSecondaryVerificationFlow(codeFromUrl || submittedCode);
             });
         }
 

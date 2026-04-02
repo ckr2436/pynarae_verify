@@ -48,6 +48,11 @@ body.pynarae-verify--scanner-open {
     color: #8a1f1f;
 }
 
+.pynarae-verify__scanner-modal[hidden],
+.pynarae-verify__confirm-modal[hidden] {
+    display: none !important;
+}
+
 .pynarae-verify__scanner-modal {
     position: fixed;
     inset: 0;
@@ -115,10 +120,13 @@ body.pynarae-verify--scanner-open {
     inset: 0;
     z-index: 10000;
     background: rgba(0, 0, 0, .55);
-    display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
+}
+
+.pynarae-verify__confirm-modal:not([hidden]) {
+    display: flex;
 }
 
 .pynarae-verify__confirm-dialog {
