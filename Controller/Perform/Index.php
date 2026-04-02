@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pynarae\Verify\Controller\Challenge;
+namespace Pynarae\Verify\Controller\Perform;
 
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
@@ -12,14 +12,16 @@ use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Exception\LocalizedException;
 use Pynarae\Verify\Model\SecondaryVerificationManager;
+use Pynarae\Verify\Model\VerificationService;
 
-class Create extends Action implements HttpPostActionInterface
+class Index extends Action implements HttpPostActionInterface
 {
     public function __construct(
         Context $context,
         private JsonFactory $resultJsonFactory,
         private FormKeyValidator $formKeyValidator,
-        private SecondaryVerificationManager $secondaryVerificationManager
+        private SecondaryVerificationManager $secondaryVerificationManager,
+        private VerificationService $verificationService
     ) {
         parent::__construct($context);
     }
@@ -34,26 +36,49 @@ class Create extends Action implements HttpPostActionInterface
             ], 400);
         }
 
+        $request = $this->getRequest();
+        $code = trim((string)$request->getParam('code', ''));
+        $verificationToken = trim((string)$request->getParam(SecondaryVerificationManager::TOKEN_PARAM, ''));
+
+        if ($code === '' || $verificationToken === '') {
+            return $this->jsonResponse([
+                'success' => false,
+                'code' => 'invalid_request',
+                'message' => (string)__('The verification request is incomplete. Please try again.'),
+            ], 400);
+        }
+
+        $tokenResult = $this->secondaryVerificationManager->consumeVerificationTokenDetailed(
+            $verificationToken,
+            $code
+        );
+
+        if (empty($tokenResult['success'])) {
+            return $this->jsonResponse([
+                'success' => false,
+                'code' => $tokenResult['error_code'] ?? 'secondary_verification_failed',
+                'message' => $tokenResult['message'] ?? (string)__('Secondary verification failed. Please try again.'),
+            ], 422);
+        }
+
         try {
-            $challenge = $this->secondaryVerificationManager->issueChallenge();
+            $verificationResult = $this->verificationService->verify($code);
 
             return $this->jsonResponse([
                 'success' => true,
-                'challenge_id' => $challenge['id'],
-                'challenge_code' => $challenge['code'],
-                'expires_at' => $challenge['expires_at'],
+                'result' => $verificationResult,
             ]);
         } catch (LocalizedException $e) {
             return $this->jsonResponse([
                 'success' => false,
-                'code' => 'rate_limited',
+                'code' => 'verification_unavailable',
                 'message' => (string)$e->getMessage(),
-            ], 429);
+            ], 503);
         } catch (\Throwable $e) {
             return $this->jsonResponse([
                 'success' => false,
-                'code' => 'challenge_unavailable',
-                'message' => (string)__('Secondary verification is currently unavailable. Please try again later.'),
+                'code' => 'verification_unavailable',
+                'message' => (string)__('We could not complete verification. Please try again later.'),
             ], 503);
         }
     }

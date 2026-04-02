@@ -8,7 +8,6 @@ define(['require'], function (require) {
         }
 
         var scanTrigger = scannerRoot.querySelector('[data-role="scan-trigger"]');
-        var codeParamName = (scannerRoot.getAttribute('data-code-param') || 'code').trim() || 'code';
         var scanMessage = scannerRoot.querySelector('[data-role="scan-message"]');
         var scanModal = scannerRoot.querySelector('[data-role="scan-modal"]');
         var scanVideo = scannerRoot.querySelector('[data-role="scan-video"]');
@@ -20,16 +19,29 @@ define(['require'], function (require) {
         var confirmError = scannerRoot.querySelector('[data-role="confirm-error"]');
         var confirmSubmit = scannerRoot.querySelector('[data-role="confirm-submit"]');
         var confirmCancel = scannerRoot.querySelector('[data-role="confirm-cancel"]');
-        var resultPanel = document.querySelector('[data-role="verify-result"]');
+
         var startSecondaryButton = scannerRoot.querySelector('[data-role="start-secondary-verification"]');
+        var pendingPanel = document.querySelector('[data-role="pending-panel"]');
+        var pendingDetails = document.querySelector('[data-role="pending-details"]');
+
+        var resultPanel = document.querySelector('[data-role="verify-result"]');
+        var resultTitle = document.querySelector('[data-role="verify-result-title"]');
+        var resultText = document.querySelector('[data-role="verify-result-text"]');
+        var detailsContainer = document.querySelector('[data-role="verify-details"]');
+        var detailsBody = document.querySelector('[data-role="verify-details-body"]');
+
+        var codeParamName = (scannerRoot.getAttribute('data-code-param') || 'code').trim() || 'code';
         var submittedCode = (scannerRoot.getAttribute('data-submitted-code') || '').trim();
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
-        var challengeCreateUrl = (scannerRoot.getAttribute('data-secondary-challenge-url') || '').trim();
-        var challengeVerifyUrl = (scannerRoot.getAttribute('data-secondary-verify-url') || '').trim();
+        var challengeCreateUrl = (scannerRoot.getAttribute('data-challenge-create-url') || '').trim();
+        var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
+        var performUrl = (scannerRoot.getAttribute('data-perform-url') || '').trim();
         var secondaryTokenParamName = (scannerRoot.getAttribute('data-secondary-token-param') || '_svt').trim() || '_svt';
-        var currentLocationUrl = new URL(window.location.href);
-        var existingSecondaryToken = (currentLocationUrl.searchParams.get(secondaryTokenParamName) || '').trim();
-        var startSecondaryInProgress = false;
+        var formKey = (scannerRoot.getAttribute('data-form-key') || '').trim();
+
+        var showProductSku = (scannerRoot.getAttribute('data-show-product-sku') || '') === '1';
+        var showBatchNo = (scannerRoot.getAttribute('data-show-batch-no') || '') === '1';
+        var showScanCount = (scannerRoot.getAttribute('data-show-scan-count') || '') === '1';
 
         if (!scanTrigger || !scanMessage || !scanModal || !scanVideo || !scanStop) {
             return;
@@ -44,6 +56,7 @@ define(['require'], function (require) {
         var isDetectingFrame = false;
         var openSessionId = 0;
         var messages = config.messages || {};
+        var startSecondaryInProgress = false;
 
         var detector = null;
         var activeFallback = null;
@@ -104,6 +117,178 @@ define(['require'], function (require) {
         var setMessage = function (message, isError) {
             scanMessage.textContent = message || '';
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
+        };
+
+        var setResultCssClass = function (status) {
+            var cssClass = 'pynarae-verify__result pynarae-verify__result--notice';
+
+            if (status === 'success') {
+                cssClass = 'pynarae-verify__result pynarae-verify__result--success';
+            } else if (status === 'error') {
+                cssClass = 'pynarae-verify__result pynarae-verify__result--error';
+            }
+
+            if (resultPanel) {
+                resultPanel.className = cssClass;
+            }
+        };
+
+        var clearRenderedDetails = function () {
+            if (detailsBody) {
+                detailsBody.innerHTML = '';
+            }
+        };
+
+        var appendDetailRow = function (label, value) {
+            if (!detailsBody) {
+                return;
+            }
+
+            if (typeof value === 'undefined' || value === null || value === '') {
+                return;
+            }
+
+            var tr = document.createElement('tr');
+            var th = document.createElement('th');
+            var td = document.createElement('td');
+
+            th.textContent = label;
+            td.textContent = String(value);
+
+            tr.appendChild(th);
+            tr.appendChild(td);
+            detailsBody.appendChild(tr);
+        };
+
+        var focusResultPanel = function () {
+            if (!resultPanel) {
+                return;
+            }
+
+            resultPanel.hidden = false;
+            resultPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
+
+            if (typeof resultPanel.focus === 'function') {
+                resultPanel.focus({preventScroll: true});
+            }
+        };
+
+        var renderRecoverableError = function (title, message) {
+            if (!resultPanel || !resultTitle || !resultText) {
+                return;
+            }
+
+            setResultCssClass('error');
+            resultTitle.textContent = title || '';
+            resultText.textContent = message || '';
+            resultPanel.hidden = false;
+
+            if (detailsContainer) {
+                detailsContainer.hidden = true;
+            }
+
+            if (startSecondaryButton) {
+                startSecondaryButton.hidden = false;
+                startSecondaryButton.disabled = false;
+            }
+
+            if (pendingPanel) {
+                pendingPanel.hidden = false;
+            }
+
+            if (pendingDetails) {
+                pendingDetails.hidden = false;
+            }
+
+            focusResultPanel();
+        };
+
+        var renderVerificationResult = function (result) {
+            if (!resultPanel || !resultTitle || !resultText) {
+                return;
+            }
+
+            clearRenderedDetails();
+            setResultCssClass(result.status || 'notice');
+
+            resultTitle.textContent = String(result.title || '');
+            resultText.textContent = String(result.message || '');
+            resultPanel.hidden = false;
+
+            appendDetailRow('Verification Code', result.code || '');
+            appendDetailRow('Authenticity Status', result.matched ? 'Verified' : 'Unable to Verify');
+            appendDetailRow('Product Name', result.product_name || '');
+
+            if (showProductSku) {
+                appendDetailRow('Product SKU', result.product_sku || '');
+            }
+
+            if (showBatchNo) {
+                appendDetailRow('Batch Number', result.batch_no || '');
+            }
+
+            if (showScanCount && typeof result.scan_count !== 'undefined' && result.scan_count !== null) {
+                appendDetailRow('Total Successful Verifications', result.scan_count);
+            }
+
+            appendDetailRow('First Verified', result.first_scanned_at || '');
+            appendDetailRow('Last Verified', result.last_scanned_at || '');
+
+            if (detailsContainer) {
+                detailsContainer.hidden = false;
+            }
+
+            if (startSecondaryButton) {
+                startSecondaryButton.hidden = true;
+                startSecondaryButton.disabled = false;
+            }
+
+            if (pendingPanel) {
+                pendingPanel.hidden = true;
+            }
+
+            if (pendingDetails) {
+                pendingDetails.hidden = true;
+            }
+
+            focusResultPanel();
+        };
+
+        var buildPostBody = function (payload) {
+            var body = new URLSearchParams();
+
+            Object.keys(payload).forEach(function (key) {
+                if (typeof payload[key] !== 'undefined' && payload[key] !== null) {
+                    body.append(key, String(payload[key]));
+                }
+            });
+
+            return body;
+        };
+
+        var postJson = async function (url, payload) {
+            var response = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                },
+                body: buildPostBody(payload)
+            });
+
+            var data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                data = null;
+            }
+
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: data
+            };
         };
 
         var stopMediaStream = function (mediaStream) {
@@ -591,6 +776,7 @@ define(['require'], function (require) {
                 video.style.display = 'block';
                 video.style.visibility = 'visible';
                 video.style.opacity = '1';
+
                 try {
                     video.play();
                 } catch (e) {
@@ -618,6 +804,7 @@ define(['require'], function (require) {
                 var timerId = window.setTimeout(function () {
                     patchIosHtml5Preview();
                 }, delay);
+
                 html5PatchTimers.push(timerId);
             });
         };
@@ -648,6 +835,7 @@ define(['require'], function (require) {
                         } catch (e) {
                             // Ignore clear errors.
                         }
+
                         html5Scanner = null;
                         html5ScannerState = 'idle';
                         html5StartPromise = null;
@@ -682,6 +870,7 @@ define(['require'], function (require) {
                 } catch (e) {
                     // Ignore clear errors.
                 }
+
                 html5Scanner = null;
                 html5ScannerState = 'idle';
                 html5StartPromise = null;
@@ -743,148 +932,256 @@ define(['require'], function (require) {
             }
         };
 
-        var selectPreferredHtml5CameraId = function (cameras) {
-            if (!cameras || !cameras.length) {
-                return null;
-            }
-
-            var backCamera = cameras.find(function (camera) {
-                return /back|rear|environment/i.test(camera.label || '');
-            });
-
-            if (backCamera) {
-                return backCamera.id;
-            }
-
-            return cameras[cameras.length - 1].id;
-        };
-
-        var getHtml5CameraSource = async function () {
-            await ensureHtml5QrcodeLoaded();
-
-            if (typeof window.Html5Qrcode.getCameras === 'function') {
-                try {
-                    var cameras = await window.Html5Qrcode.getCameras();
-                    var preferredCameraId = selectPreferredHtml5CameraId(cameras);
-
-                    if (preferredCameraId) {
-                        return preferredCameraId;
-                    }
-                } catch (e) {
-                    // Fall through.
-                }
-            }
-
-            return {
-                facingMode: 'environment'
-            };
-        };
-
-        var getHtml5QrcodeConfig = function () {
-            var config = {
-                fps: 14,
-                rememberLastUsedCamera: false,
-                disableFlip: true
-            };
-
-            if (isAppleMobileDevice) {
-                config.fps = 15;
-                config.qrbox = function (viewfinderWidth, viewfinderHeight) {
-                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.62);
-                    edge = Math.max(200, Math.min(320, edge));
-
-                    return {
-                        width: edge,
-                        height: edge
-                    };
+        var requestServerChallenge = async function () {
+            if (!challengeCreateUrl) {
+                return {
+                    success: false,
+                    message: messages.secondVerifyUnavailable || messages.scanFailedRetry
                 };
             }
 
-            return config;
+            try {
+                var response = await postJson(challengeCreateUrl, {
+                    form_key: formKey
+                });
+
+                if (!response.data || response.data.success !== true) {
+                    return {
+                        success: false,
+                        code: response.data && response.data.code ? response.data.code : 'challenge_unavailable',
+                        message: response.data && response.data.message
+                            ? response.data.message
+                            : (messages.secondVerifyUnavailable || messages.scanFailedRetry)
+                    };
+                }
+
+                return {
+                    success: true,
+                    challengeId: String(response.data.challenge_id),
+                    challengeCode: String(response.data.challenge_code)
+                };
+            } catch (e) {
+                return {
+                    success: false,
+                    message: messages.secondVerifyUnavailable || messages.scanFailedRetry
+                };
+            }
         };
 
-        var startIosHtml5QrcodeScanner = async function (sessionId) {
-            await ensureHtml5QrcodeLoaded();
-
-            if (sessionId !== openSessionId) {
-                return;
+        var verifyServerChallenge = async function (challengeId, challengeCode, scannedCode) {
+            if (!challengeVerifyUrl || !challengeId || !challengeCode || !scannedCode) {
+                return {
+                    success: false,
+                    message: messages.secondVerifyUnavailable || messages.scanFailedRetry
+                };
             }
 
-            await stopHtml5Scanner();
+            try {
+                var response = await postJson(challengeVerifyUrl, {
+                    form_key: formKey,
+                    challenge_id: challengeId,
+                    challenge_code: challengeCode,
+                    verification_code: scannedCode
+                });
 
-            if (sessionId !== openSessionId) {
-                return;
+                if (!response.data || response.data.success !== true || !response.data.token) {
+                    return {
+                        success: false,
+                        code: response.data && response.data.code ? response.data.code : 'challenge_failed',
+                        message: response.data && response.data.message
+                            ? response.data.message
+                            : (messages.secondVerifyInvalid || messages.scanFailedRetry)
+                    };
+                }
+
+                return {
+                    success: true,
+                    token: String(response.data.token)
+                };
+            } catch (e) {
+                return {
+                    success: false,
+                    message: messages.secondVerifyUnavailable || messages.scanFailedRetry
+                };
+            }
+        };
+
+        var performVerification = async function (code, verificationToken) {
+            if (!performUrl || !code || !verificationToken) {
+                return {
+                    success: false,
+                    code: 'invalid_request',
+                    message: messages.verificationTryAgain || messages.scanFailedRetry
+                };
             }
 
-            ensureIosOverlay();
-            showIosOverlay();
+            try {
+                var response = await postJson(performUrl, {
+                    form_key: formKey,
+                    code: code,
+                    _svt: verificationToken
+                });
 
-            html5Scanner = new window.Html5Qrcode(iosOverlayCameraRoot.id);
-            html5ScannerState = 'starting';
-
-            var onScanSuccess = function (decodedText) {
-                if (sessionId !== openSessionId || isFinishingScan) {
-                    return;
+                if (!response.data) {
+                    return {
+                        success: false,
+                        code: 'verification_unavailable',
+                        message: messages.verificationTryAgain || messages.scanFailedRetry
+                    };
                 }
 
-                var qrValue = (decodedText || '').trim();
-                if (!qrValue) {
-                    return;
-                }
+                return response.data;
+            } catch (e) {
+                return {
+                    success: false,
+                    code: 'verification_unavailable',
+                    message: messages.verificationTryAgain || messages.scanFailedRetry
+                };
+            }
+        };
 
-                isFinishingScan = true;
-                clearTimers();
-                setIosGuideState('success');
-                setMessage(messages.successDetected, false);
+        var requestSecondVerification = async function (scannedCode) {
+            if (
+                !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
+                !confirmError || !confirmSubmit || !confirmCancel
+            ) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return {
+                    success: false,
+                    message: messages.secondVerifyUnavailable || messages.scanFailedRetry
+                };
+            }
 
-                successDelayTimer = window.setTimeout(function () {
-                    if (sessionId !== openSessionId) {
+            var challenge = await requestServerChallenge();
+            if (!challenge.success) {
+                setMessage(challenge.message || messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return challenge;
+            }
+
+            return new Promise(function (resolve) {
+                confirmGuide.textContent = messages.secondVerifyPrompt || '';
+                confirmCode.textContent = challenge.challengeCode;
+                confirmInput.value = '';
+                confirmError.textContent = '';
+                confirmError.hidden = true;
+                confirmModal.hidden = false;
+
+                var cleanup = function () {
+                    confirmSubmit.removeEventListener('click', onSubmit);
+                    confirmCancel.removeEventListener('click', onCancel);
+                    confirmInput.removeEventListener('keydown', onInputKeyDown);
+                    confirmModal.hidden = true;
+                };
+
+                var onCancel = function () {
+                    cleanup();
+                    setMessage(messages.secondVerifyCancelled || messages.scanFailedRetry, true);
+                    resolve({
+                        success: false,
+                        code: 'cancelled',
+                        message: messages.secondVerifyCancelled || messages.scanFailedRetry
+                    });
+                };
+
+                var onSubmit = async function () {
+                    var value = String(confirmInput.value || '').trim();
+
+                    if (value === '') {
+                        confirmError.textContent = messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
                         return;
                     }
 
-                    closeScanner({syncHistory: true, invalidateSession: true});
-                    submitScannedCode(qrValue, allowedHosts);
-                }, 650);
-            };
-
-            var onScanFailure = function () {
-                // Ignore per-frame misses.
-            };
-
-            var cameraSource = await getHtml5CameraSource();
-
-            if (sessionId !== openSessionId) {
-                return;
-            }
-
-            html5StartPromise = html5Scanner.start(
-                cameraSource,
-                getHtml5QrcodeConfig(),
-                onScanSuccess,
-                onScanFailure
-            ).then(function () {
-                html5ScannerState = 'running';
-                setIosGuideState('idle');
-                patchIosHtml5Preview();
-                scheduleIosHtml5Patches();
-                resetIosPinchState();
-
-                window.setTimeout(function () {
-                    if (sessionId !== openSessionId || html5ScannerState !== 'running') {
+                    var tokenResult = await verifyServerChallenge(challenge.challengeId, value, scannedCode);
+                    if (!tokenResult.success) {
+                        confirmError.textContent = tokenResult.message || messages.secondVerifyInvalid || '';
+                        confirmError.hidden = false;
+                        confirmInput.focus();
                         return;
                     }
 
-                    applyIosTrackZoomFactor(1);
-                }, 180);
-            }).catch(function (startError) {
-                html5ScannerState = 'idle';
-                html5Scanner = null;
-                html5StartPromise = null;
-                hideIosOverlay();
-                throw startError;
+                    cleanup();
+                    resolve(tokenResult);
+                };
+
+                var onInputKeyDown = function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        onSubmit();
+                    } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onCancel();
+                    }
+                };
+
+                confirmSubmit.addEventListener('click', onSubmit);
+                confirmCancel.addEventListener('click', onCancel);
+                confirmInput.addEventListener('keydown', onInputKeyDown);
+                confirmInput.focus();
             });
+        };
 
-            return html5StartPromise;
+        var getVerificationFailureMessage = function (responseData) {
+            if (!responseData) {
+                return messages.verificationTryAgain || messages.scanFailedRetry;
+            }
+
+            if (
+                responseData.code === 'secondary_verification_expired' ||
+                responseData.code === 'secondary_verification_invalid'
+            ) {
+                return responseData.message || messages.verificationExpired || messages.scanFailedRetry;
+            }
+
+            return responseData.message || messages.verificationTryAgain || messages.scanFailedRetry;
+        };
+
+        var startSecondaryVerificationFlow = async function (code) {
+            var normalizedCode = String(code || '').trim();
+            if (!normalizedCode) {
+                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
+                return;
+            }
+
+            if (startSecondaryInProgress) {
+                return;
+            }
+
+            startSecondaryInProgress = true;
+
+            if (startSecondaryButton) {
+                startSecondaryButton.disabled = true;
+            }
+
+            try {
+                setMessage(messages.pendingVerification || '', false);
+
+                var secondaryVerificationResult = await requestSecondVerification(normalizedCode);
+                if (!secondaryVerificationResult.success || !secondaryVerificationResult.token) {
+                    return;
+                }
+
+                setMessage(messages.performingVerification || messages.successSubmitting || '', false);
+
+                var performResponse = await performVerification(normalizedCode, secondaryVerificationResult.token);
+                if (performResponse.success === true && performResponse.result) {
+                    setMessage('', false);
+                    renderVerificationResult(performResponse.result);
+                    return;
+                }
+
+                renderRecoverableError(
+                    'Verification required',
+                    getVerificationFailureMessage(performResponse)
+                );
+            } finally {
+                startSecondaryInProgress = false;
+
+                if (startSecondaryButton && !startSecondaryButton.hidden) {
+                    startSecondaryButton.disabled = false;
+                }
+            }
         };
 
         var parseScannedCode = function (rawValue) {
@@ -970,201 +1267,6 @@ define(['require'], function (require) {
             }
         };
 
-        var buildRequestNonce = function () {
-            return String(Date.now()) + '-' + Math.random().toString(36).slice(2, 10);
-        };
-
-        var buildVerificationUrl = function (code, verificationToken) {
-            var targetUrl;
-
-            try {
-                targetUrl = new URL(verifyUrl, window.location.origin);
-            } catch (e) {
-                targetUrl = new URL(window.location.href);
-            }
-
-            targetUrl.searchParams.set(codeParamName, code);
-            targetUrl.searchParams.set(secondaryTokenParamName, verificationToken);
-            targetUrl.searchParams.set('_ts', buildRequestNonce());
-
-            return targetUrl.toString();
-        };
-
-        var requestServerChallenge = async function () {
-            if (!challengeCreateUrl) {
-                return null;
-            }
-
-            try {
-                var response = await fetch(challengeCreateUrl, {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    return null;
-                }
-
-                var data = await response.json();
-                if (!data || data.success !== true || !data.challenge_id || !data.challenge_code) {
-                    return null;
-                }
-
-                return {
-                    challengeId: String(data.challenge_id),
-                    challengeCode: String(data.challenge_code)
-                };
-            } catch (e) {
-                return null;
-            }
-        };
-
-        var verifyServerChallenge = async function (challengeId, challengeCode, scannedCode) {
-            if (!challengeVerifyUrl || !challengeId || !challengeCode || !scannedCode) {
-                return null;
-            }
-
-            try {
-                var verifyUrlObject = new URL(challengeVerifyUrl, window.location.origin);
-                verifyUrlObject.searchParams.set('challenge_id', challengeId);
-                verifyUrlObject.searchParams.set('challenge_code', challengeCode);
-                verifyUrlObject.searchParams.set('verification_code', scannedCode);
-
-                var response = await fetch(verifyUrlObject.toString(), {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    return null;
-                }
-
-                var data = await response.json();
-                if (!data || data.success !== true || !data.token) {
-                    return null;
-                }
-
-                return String(data.token);
-            } catch (e) {
-                return null;
-            }
-        };
-
-        var requestSecondVerification = async function (scannedCode) {
-            if (
-                !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
-                !confirmError || !confirmSubmit || !confirmCancel
-            ) {
-                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
-                return null;
-            }
-
-            var challenge = await requestServerChallenge();
-            if (!challenge) {
-                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
-                return null;
-            }
-
-            return new Promise(function (resolve) {
-                confirmGuide.textContent = messages.secondVerifyPrompt || '';
-                confirmCode.textContent = challenge.challengeCode;
-                confirmInput.value = '';
-                confirmError.textContent = '';
-                confirmError.hidden = true;
-                confirmModal.hidden = false;
-
-                var cleanup = function () {
-                    confirmSubmit.removeEventListener('click', onSubmit);
-                    confirmCancel.removeEventListener('click', onCancel);
-                    confirmInput.removeEventListener('keydown', onInputKeyDown);
-                    confirmModal.hidden = true;
-                };
-
-                var onCancel = function () {
-                    cleanup();
-                    setMessage(messages.secondVerifyCancelled || messages.scanFailedRetry, true);
-                    resolve(null);
-                };
-
-                var onSubmit = async function () {
-                    var value = String(confirmInput.value || '').trim();
-
-                    if (value === '') {
-                        confirmError.textContent = messages.secondVerifyInvalid || '';
-                        confirmError.hidden = false;
-                        confirmInput.focus();
-                        return;
-                    }
-
-                    var token = await verifyServerChallenge(challenge.challengeId, value, scannedCode);
-                    if (!token) {
-                        confirmError.textContent = messages.secondVerifyInvalid || '';
-                        confirmError.hidden = false;
-                        confirmInput.focus();
-                        return;
-                    }
-
-                    cleanup();
-                    resolve(token);
-                };
-
-                var onInputKeyDown = function (event) {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        onSubmit();
-                    } else if (event.key === 'Escape') {
-                        event.preventDefault();
-                        onCancel();
-                    }
-                };
-
-                confirmSubmit.addEventListener('click', onSubmit);
-                confirmCancel.addEventListener('click', onCancel);
-                confirmInput.addEventListener('keydown', onInputKeyDown);
-                confirmInput.focus();
-            });
-        };
-
-        var startSecondaryVerificationFlow = async function (code) {
-            var normalizedCode = String(code || '').trim();
-            if (!normalizedCode) {
-                setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
-                return;
-            }
-
-            if (startSecondaryInProgress) {
-                return;
-            }
-
-            startSecondaryInProgress = true;
-
-            if (startSecondaryButton) {
-                startSecondaryButton.disabled = true;
-            }
-
-            try {
-                var secondaryVerificationToken = await requestSecondVerification(normalizedCode);
-                if (!secondaryVerificationToken) {
-                    return;
-                }
-
-                setMessage(messages.successSubmitting, false);
-                window.location.assign(buildVerificationUrl(normalizedCode, secondaryVerificationToken));
-            } finally {
-                startSecondaryInProgress = false;
-
-                if (startSecondaryButton) {
-                    startSecondaryButton.disabled = false;
-                }
-            }
-        };
-
         var submitScannedCode = async function (qrValue, allowedHosts) {
             var parsedResult = parseAndValidateScannedCode(qrValue, allowedHosts);
             if (!parsedResult.isValid) {
@@ -1178,13 +1280,11 @@ define(['require'], function (require) {
         var isMobile = window.matchMedia('(pointer: coarse)').matches ||
             /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-        if (submittedCode && !existingSecondaryToken) {
+        if (submittedCode) {
             setMessage(messages.pendingVerification || messages.desktopGuide, false);
         } else if (!isMobile) {
             setMessage(messages.desktopGuide, false);
         }
-
-
 
         if (startSecondaryButton) {
             startSecondaryButton.addEventListener('click', async function () {
@@ -1210,7 +1310,7 @@ define(['require'], function (require) {
         if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
             scanTrigger.hidden = true;
 
-            if (!(submittedCode && !existingSecondaryToken)) {
+            if (!submittedCode) {
                 setMessage(messages.noCameraApi, true);
             }
 
@@ -1298,6 +1398,7 @@ define(['require'], function (require) {
                         }).catch(function () {
                             resolve(image);
                         });
+
                         return;
                     }
 
@@ -1327,6 +1428,7 @@ define(['require'], function (require) {
                 addDetail(error.message);
                 addDetail(error.name);
                 addDetail(error.code);
+
                 if (error.constructor && typeof error.constructor.name === 'string') {
                     addDetail(error.constructor.name);
                 }
@@ -1477,8 +1579,10 @@ define(['require'], function (require) {
                             activeFallback = {
                                 name: 'html5-qrcode'
                             };
+
                             return activeFallback;
                         }
+
                         return loaded;
                     } catch (e) {
                         if (sessionDisabledFallbacks[item.name] === true) {
@@ -1515,22 +1619,6 @@ define(['require'], function (require) {
             // Ignore URL parsing failures and fall back to current host only.
         }
 
-        var scrollToResultIfPresent = function () {
-            var url = new URL(window.location.href);
-
-            if (!url.searchParams.get(codeParamName) || !resultPanel) {
-                return;
-            }
-
-            resultPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
-
-            if (typeof resultPanel.focus === 'function') {
-                resultPanel.focus({preventScroll: true});
-            }
-        };
-
-        scrollToResultIfPresent();
-
         var waitForVideoReady = function (timeoutMs, sessionId) {
             var maxWait = typeof timeoutMs === 'number' ? timeoutMs : 5000;
 
@@ -1548,6 +1636,7 @@ define(['require'], function (require) {
                     if (settled) {
                         return;
                     }
+
                     settled = true;
                     cleanup();
                     resolve();
@@ -1557,6 +1646,7 @@ define(['require'], function (require) {
                     if (settled) {
                         return;
                     }
+
                     settled = true;
                     cleanup();
                     reject(error);
@@ -1660,7 +1750,6 @@ define(['require'], function (require) {
                     try {
                         var image = await loadImageFromObjectUrl(objectUrl);
                         var zxingResult = await fallback.detector.decodeFromImageElement(image);
-
                         return zxingResult && zxingResult.text ? zxingResult.text : '';
                     } finally {
                         URL.revokeObjectURL(objectUrl);
@@ -1732,6 +1821,150 @@ define(['require'], function (require) {
             }
 
             scheduleNextScan(sessionId, 220);
+        };
+
+        var selectPreferredHtml5CameraId = function (cameras) {
+            if (!cameras || !cameras.length) {
+                return null;
+            }
+
+            var backCamera = cameras.find(function (camera) {
+                return /back|rear|environment/i.test(camera.label || '');
+            });
+
+            if (backCamera) {
+                return backCamera.id;
+            }
+
+            return cameras[cameras.length - 1].id;
+        };
+
+        var getHtml5CameraSource = async function () {
+            await ensureHtml5QrcodeLoaded();
+
+            if (typeof window.Html5Qrcode.getCameras === 'function') {
+                try {
+                    var cameras = await window.Html5Qrcode.getCameras();
+                    var preferredCameraId = selectPreferredHtml5CameraId(cameras);
+
+                    if (preferredCameraId) {
+                        return preferredCameraId;
+                    }
+                } catch (e) {
+                    // Fall through.
+                }
+            }
+
+            return {
+                facingMode: 'environment'
+            };
+        };
+
+        var getHtml5QrcodeConfig = function () {
+            var qrConfig = {
+                fps: 14,
+                rememberLastUsedCamera: false,
+                disableFlip: true
+            };
+
+            if (isAppleMobileDevice) {
+                qrConfig.fps = 15;
+                qrConfig.qrbox = function (viewfinderWidth, viewfinderHeight) {
+                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.62);
+                    edge = Math.max(200, Math.min(320, edge));
+
+                    return {
+                        width: edge,
+                        height: edge
+                    };
+                };
+            }
+
+            return qrConfig;
+        };
+
+        var startIosHtml5QrcodeScanner = async function (sessionId) {
+            await ensureHtml5QrcodeLoaded();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            await stopHtml5Scanner();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            ensureIosOverlay();
+            showIosOverlay();
+
+            html5Scanner = new window.Html5Qrcode(iosOverlayCameraRoot.id);
+            html5ScannerState = 'starting';
+
+            var onScanSuccess = function (decodedText) {
+                if (sessionId !== openSessionId || isFinishingScan) {
+                    return;
+                }
+
+                var qrValue = (decodedText || '').trim();
+                if (!qrValue) {
+                    return;
+                }
+
+                isFinishingScan = true;
+                clearTimers();
+                setIosGuideState('success');
+                setMessage(messages.successDetected, false);
+
+                successDelayTimer = window.setTimeout(function () {
+                    if (sessionId !== openSessionId) {
+                        return;
+                    }
+
+                    closeScanner({syncHistory: true, invalidateSession: true});
+                    submitScannedCode(qrValue, allowedHosts);
+                }, 650);
+            };
+
+            var onScanFailure = function () {
+                // Ignore per-frame misses.
+            };
+
+            var cameraSource = await getHtml5CameraSource();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            html5StartPromise = html5Scanner.start(
+                cameraSource,
+                getHtml5QrcodeConfig(),
+                onScanSuccess,
+                onScanFailure
+            ).then(function () {
+                html5ScannerState = 'running';
+                setIosGuideState('idle');
+                patchIosHtml5Preview();
+                scheduleIosHtml5Patches();
+                resetIosPinchState();
+
+                window.setTimeout(function () {
+                    if (sessionId !== openSessionId || html5ScannerState !== 'running') {
+                        return;
+                    }
+
+                    applyIosTrackZoomFactor(1);
+                }, 180);
+            }).catch(function (startError) {
+                html5ScannerState = 'idle';
+                html5Scanner = null;
+                html5StartPromise = null;
+                hideIosOverlay();
+                throw startError;
+            });
+
+            return html5StartPromise;
         };
 
         scanTrigger.addEventListener('click', async function () {
@@ -1851,6 +2084,7 @@ define(['require'], function (require) {
                 }
 
                 resetIosPinchState();
+
                 window.setTimeout(function () {
                     if (sessionId !== openSessionId || !isScannerOpen) {
                         return;
@@ -1881,6 +2115,7 @@ define(['require'], function (require) {
             closeScanner({syncHistory: true, invalidateSession: true});
             setMessage(messages.scanFailedRetry, true);
         });
+
         window.addEventListener('popstate', function () {
             if (!isScannerOpen) {
                 return;

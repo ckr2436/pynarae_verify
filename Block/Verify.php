@@ -5,25 +5,18 @@ declare(strict_types=1);
 namespace Pynarae\Verify\Block;
 
 use Magento\Framework\App\RequestInterface;
-use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Data\Form\FormKey;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Pynarae\Verify\Model\Config;
-use Pynarae\Verify\Model\SecondaryVerificationManager;
-use Pynarae\Verify\Model\VerificationService;
 
 class Verify extends Template
 {
-    private ?array $verificationResult = null;
-    private bool $verificationLoaded = false;
-    private ?string $requestNonce = null;
-
     public function __construct(
         Context $context,
         private Config $config,
         private RequestInterface $request,
-        private SecondaryVerificationManager $secondaryVerificationManager,
-        private VerificationService $verificationService,
+        private FormKey $formKey,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -54,6 +47,7 @@ class Verify extends Template
     {
         $paramName = $this->getCodeParam();
         $value = trim((string)$this->request->getParam($paramName, ''));
+
         if ($value === '' && $paramName !== 'code') {
             $value = trim((string)$this->request->getParam('code', ''));
         }
@@ -66,76 +60,19 @@ class Verify extends Template
         return $this->getSubmittedCode() !== '';
     }
 
-    public function hasSecondaryVerificationToken(): bool
+    public function shouldRenderPendingState(): bool
     {
-        return trim((string)$this->request->getParam(SecondaryVerificationManager::TOKEN_PARAM, '')) !== '';
+        return $this->hasSubmittedCode();
     }
 
-    public function needsSecondaryVerification(): bool
+    public function shouldShowContinueVerificationButton(): bool
     {
-        return $this->hasSubmittedCode() && !$this->hasSecondaryVerificationToken();
+        return $this->hasSubmittedCode();
     }
 
     public function getCodeParam(): string
     {
         return $this->config->getQrCodeParam();
-    }
-
-    public function getVerificationResult(): ?array
-    {
-        if ($this->verificationLoaded) {
-            return $this->verificationResult;
-        }
-
-        $this->verificationLoaded = true;
-        $code = $this->getSubmittedCode();
-
-        if ($code === '') {
-            return null;
-        }
-
-        $verificationToken = trim((string)$this->request->getParam(
-            SecondaryVerificationManager::TOKEN_PARAM,
-            ''
-        ));
-
-        if ($verificationToken === '') {
-            return null;
-        }
-
-        if (!$this->secondaryVerificationManager->consumeVerificationToken($verificationToken, $code)) {
-            $this->verificationResult = [
-                'status' => 'error',
-                'title' => (string)__('Verification blocked'),
-                'message' => (string)__('Secondary verification is invalid or expired. Please try again.'),
-                'code' => $code,
-                'matched' => false,
-            ];
-
-            return $this->verificationResult;
-        }
-
-        try {
-            $this->verificationResult = $this->verificationService->verify($code);
-        } catch (LocalizedException $e) {
-            $this->verificationResult = [
-                'status' => 'error',
-                'title' => (string)__('Verification unavailable'),
-                'message' => (string)$e->getMessage(),
-                'code' => $code,
-                'matched' => false,
-            ];
-        } catch (\Throwable $e) {
-            $this->verificationResult = [
-                'status' => 'error',
-                'title' => (string)__('Verification unavailable'),
-                'message' => (string)__('We could not complete verification. Please try again later.'),
-                'code' => $code,
-                'matched' => false,
-            ];
-        }
-
-        return $this->verificationResult;
     }
 
     public function getVerifyUrl(): string
@@ -153,33 +90,14 @@ class Verify extends Template
         return $this->getUrl('verify/challenge/verify');
     }
 
-    public function getRequestNonce(): string
+    public function getPerformUrl(): string
     {
-        if ($this->requestNonce !== null) {
-            return $this->requestNonce;
-        }
-
-        try {
-            $random = bin2hex(random_bytes(8));
-        } catch (\Throwable $e) {
-            $random = str_replace('.', '', uniqid('', true));
-        }
-
-        $microtime = str_replace('.', '', sprintf('%.6f', microtime(true)));
-        $this->requestNonce = $microtime . '-' . $random;
-
-        return $this->requestNonce;
+        return $this->getUrl('verify/perform');
     }
 
-    public function getStatusCssClass(): string
+    public function getFormKey(): string
     {
-        $status = (string)($this->getVerificationResult()['status'] ?? 'notice');
-
-        return match ($status) {
-            'success' => 'pynarae-verify__result pynarae-verify__result--success',
-            'error' => 'pynarae-verify__result pynarae-verify__result--error',
-            default => 'pynarae-verify__result pynarae-verify__result--notice',
-        };
+        return $this->formKey->getFormKey();
     }
 
     public function shouldShowProductSku(): bool

@@ -6,23 +6,33 @@ namespace Pynarae\Verify\Controller\Challenge;
 
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
-use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Pynarae\Verify\Model\SecondaryVerificationManager;
 
-class Verify extends Action implements HttpGetActionInterface
+class Verify extends Action implements HttpPostActionInterface
 {
     public function __construct(
         Context $context,
         private JsonFactory $resultJsonFactory,
+        private FormKeyValidator $formKeyValidator,
         private SecondaryVerificationManager $secondaryVerificationManager
     ) {
         parent::__construct($context);
     }
 
-    public function execute()
+    public function execute(): Json
     {
-        $result = $this->resultJsonFactory->create();
+        if (!$this->formKeyValidator->validate($this->getRequest())) {
+            return $this->jsonResponse([
+                'success' => false,
+                'code' => 'invalid_csrf',
+                'message' => (string)__('Your session has expired. Please refresh the page and try again.'),
+            ], 400);
+        }
+
         $request = $this->getRequest();
 
         $challengeId = trim((string)$request->getParam('challenge_id', ''));
@@ -30,22 +40,47 @@ class Verify extends Action implements HttpGetActionInterface
         $verificationCode = trim((string)$request->getParam('verification_code', ''));
 
         if ($challengeId === '' || $challengeCode === '' || $verificationCode === '') {
-            return $result->setData([
+            return $this->jsonResponse([
                 'success' => false,
-            ]);
+                'code' => 'invalid_request',
+                'message' => (string)__('The verification request is incomplete. Please try again.'),
+            ], 400);
         }
 
-        $token = $this->secondaryVerificationManager->validateChallenge($challengeId, $challengeCode, $verificationCode);
+        $result = $this->secondaryVerificationManager->validateChallengeDetailed(
+            $challengeId,
+            $challengeCode,
+            $verificationCode
+        );
 
-        if ($token === null) {
-            return $result->setData([
+        if (empty($result['success'])) {
+            $statusCode = (($result['error_code'] ?? '') === 'rate_limited') ? 429 : 422;
+
+            return $this->jsonResponse([
                 'success' => false,
-            ]);
+                'code' => $result['error_code'] ?? 'challenge_failed',
+                'message' => $result['message'] ?? (string)__('Secondary verification failed. Please try again.'),
+            ], $statusCode);
         }
 
-        return $result->setData([
+        return $this->jsonResponse([
             'success' => true,
-            'token' => $token,
+            'token' => $result['token'],
         ]);
+    }
+
+    private function jsonResponse(array $data, int $statusCode = 200): Json
+    {
+        $result = $this->resultJsonFactory->create();
+        $result->setHttpResponseCode($statusCode);
+        $result->setData($data);
+
+        $response = $this->getResponse();
+        $response->setNoCacheHeaders();
+        $response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0', true);
+        $response->setHeader('Pragma', 'no-cache', true);
+        $response->setHeader('Expires', '0', true);
+
+        return $result;
     }
 }

@@ -1,15 +1,18 @@
 <?php
 /** @var \Pynarae\Verify\Block\Verify $block */
-$result = $block->getVerificationResult();
 $submittedCode = $block->getSubmittedCode();
-$needsSecondaryVerification = $block->needsSecondaryVerification();
+$introText = trim($block->getIntroText());
 ?>
 <div class="pynarae-verify">
     <div class="pynarae-verify__card">
         <h1 class="pynarae-verify__title"><?= $block->escapeHtml(__('Verify Product Authenticity')) ?></h1>
 
         <p class="pynarae-verify__intro">
-            <?= $block->escapeHtml(__('Scan the authenticity QR code on your package to confirm that your product is genuine.')) ?>
+            <?php if ($introText !== ''): ?>
+                <?= $block->escapeHtml($introText) ?>
+            <?php else: ?>
+                <?= $block->escapeHtml(__('Scan the authenticity QR code on your package to confirm that your product is genuine.')) ?>
+            <?php endif; ?>
         </p>
 
         <?php if (!$block->isEnabled()): ?>
@@ -17,9 +20,8 @@ $needsSecondaryVerification = $block->needsSecondaryVerification();
                 <?= $block->escapeHtml(__('Authenticity verification is currently unavailable. Please try again later.')) ?>
             </div>
         <?php else: ?>
-
-            <?php if ($needsSecondaryVerification): ?>
-                <div class="pynarae-verify__result pynarae-verify__result--notice">
+            <?php if ($block->shouldRenderPendingState()): ?>
+                <div class="pynarae-verify__result pynarae-verify__result--notice" data-role="pending-panel">
                     <div class="pynarae-verify__result-title">
                         <?= $block->escapeHtml(__('Verification confirmation required')) ?>
                     </div>
@@ -28,7 +30,7 @@ $needsSecondaryVerification = $block->needsSecondaryVerification();
                     </div>
                 </div>
 
-                <div class="pynarae-verify__details">
+                <div class="pynarae-verify__details" data-role="pending-details">
                     <table class="data table">
                         <tbody>
                         <tr>
@@ -49,11 +51,16 @@ $needsSecondaryVerification = $block->needsSecondaryVerification();
                  data-code-param="<?= $block->escapeHtmlAttr($block->getCodeParam()) ?>"
                  data-submitted-code="<?= $block->escapeHtmlAttr($submittedCode) ?>"
                  data-verify-url="<?= $block->escapeUrl($block->getVerifyUrl()) ?>"
-                 data-secondary-challenge-url="<?= $block->escapeUrl($block->getChallengeCreateUrl()) ?>"
-                 data-secondary-verify-url="<?= $block->escapeUrl($block->getChallengeVerifyUrl()) ?>"
-                 data-secondary-token-param="<?= $block->escapeHtmlAttr(\Pynarae\Verify\Model\SecondaryVerificationManager::TOKEN_PARAM) ?>">
+                 data-challenge-create-url="<?= $block->escapeUrl($block->getChallengeCreateUrl()) ?>"
+                 data-challenge-verify-url="<?= $block->escapeUrl($block->getChallengeVerifyUrl()) ?>"
+                 data-perform-url="<?= $block->escapeUrl($block->getPerformUrl()) ?>"
+                 data-secondary-token-param="<?= $block->escapeHtmlAttr(\Pynarae\Verify\Model\SecondaryVerificationManager::TOKEN_PARAM) ?>"
+                 data-form-key="<?= $block->escapeHtmlAttr($block->getFormKey()) ?>"
+                 data-show-product-sku="<?= $block->shouldShowProductSku() ? '1' : '0' ?>"
+                 data-show-batch-no="<?= $block->shouldShowBatchNo() ? '1' : '0' ?>"
+                 data-show-scan-count="<?= $block->shouldShowScanCount() ? '1' : '0' ?>">
 
-                <?php if ($needsSecondaryVerification): ?>
+                <?php if ($block->shouldShowContinueVerificationButton()): ?>
                     <button class="action primary pynarae-verify__scan-button" type="button" data-role="start-secondary-verification">
                         <span><?= $block->escapeHtml(__('CONTINUE VERIFICATION')) ?></span>
                     </button>
@@ -101,69 +108,16 @@ $needsSecondaryVerification = $block->needsSecondaryVerification();
                 </div>
             </div>
 
-            <?php if ($result): ?>
-                <div class="<?= $block->escapeHtmlAttr($block->getStatusCssClass()) ?>" data-role="verify-result" tabindex="-1">
-                    <div class="pynarae-verify__result-title"><?= $block->escapeHtml($result['title'] ?? '') ?></div>
-                    <div class="pynarae-verify__result-text"><?= $block->escapeHtml($result['message'] ?? '') ?></div>
-                </div>
+            <div class="pynarae-verify__result" data-role="verify-result" tabindex="-1" hidden>
+                <div class="pynarae-verify__result-title" data-role="verify-result-title"></div>
+                <div class="pynarae-verify__result-text" data-role="verify-result-text"></div>
+            </div>
 
-                <div class="pynarae-verify__details">
-                    <table class="data table">
-                        <tbody>
-                        <tr>
-                            <th><?= $block->escapeHtml(__('Verification Code')) ?></th>
-                            <td><?= $block->escapeHtml($result['code'] ?? '') ?></td>
-                        </tr>
-                        <tr>
-                            <th><?= $block->escapeHtml(__('Authenticity Status')) ?></th>
-                            <td><?= !empty($result['matched']) ? $block->escapeHtml(__('Verified')) : $block->escapeHtml(__('Unable to Verify')) ?></td>
-                        </tr>
-
-                        <?php if (!empty($result['product_name'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('Product Name')) ?></th>
-                                <td><?= $block->escapeHtml($result['product_name']) ?></td>
-                            </tr>
-                        <?php endif; ?>
-
-                        <?php if ($block->shouldShowProductSku() && !empty($result['product_sku'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('Product SKU')) ?></th>
-                                <td><?= $block->escapeHtml($result['product_sku']) ?></td>
-                            </tr>
-                        <?php endif; ?>
-
-                        <?php if ($block->shouldShowBatchNo() && !empty($result['batch_no'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('Batch Number')) ?></th>
-                                <td><?= $block->escapeHtml($result['batch_no']) ?></td>
-                            </tr>
-                        <?php endif; ?>
-
-                        <?php if ($block->shouldShowScanCount() && isset($result['scan_count'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('Total Successful Verifications')) ?></th>
-                                <td><?= (int)$result['scan_count'] ?></td>
-                            </tr>
-                        <?php endif; ?>
-
-                        <?php if (!empty($result['first_scanned_at'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('First Verified')) ?></th>
-                                <td><?= $block->escapeHtml($result['first_scanned_at']) ?></td>
-                            </tr>
-                        <?php endif; ?>
-
-                        <?php if (!empty($result['last_scanned_at'])): ?>
-                            <tr>
-                                <th><?= $block->escapeHtml(__('Last Verified')) ?></th>
-                                <td><?= $block->escapeHtml($result['last_scanned_at']) ?></td>
-                            </tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
+            <div class="pynarae-verify__details" data-role="verify-details" hidden>
+                <table class="data table">
+                    <tbody data-role="verify-details-body"></tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </div>
 </div>
@@ -174,23 +128,26 @@ $needsSecondaryVerification = $block->needsSecondaryVerification();
         "Pynarae_Verify/js/verify-scanner": {
             "rootSelector": "[data-role=\"qr-scanner\"]",
             "messages": {
-                "desktopGuide": "<?= $block->escapeJsQuote(__('Use your mobile phone camera to scan the authenticity QR code on the product package.'), '"') ?>",
-                "noCameraApi": "<?= $block->escapeJsQuote(__('This device cannot access a camera. Please open this page on a mobile phone and scan the authenticity QR code.'), '"') ?>",
-                "loadingFallback": "<?= $block->escapeJsQuote(__('Preparing the QR scanner...'), '"') ?>",
-                "noFallbackScanner": "<?= $block->escapeJsQuote(__('Unable to initialize the QR scanner on this device. Please use a mobile phone camera instead.'), '"') ?>",
-                "cameraDenied": "<?= $block->escapeJsQuote(__('Camera access is unavailable. Please allow camera access or use another mobile device to scan the authenticity QR code.'), '"') ?>",
-                "scanning": "<?= $block->escapeJsQuote(__('Align the authenticity QR code within the frame. Verification will continue automatically after a successful scan.'), '"') ?>",
-                "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start the camera preview. Please try again or use another mobile device.'), '"') ?>",
-                "successDetected": "<?= $block->escapeJsQuote(__('QR code detected. Verifying now...'), '"') ?>",
-                "successSubmitting": "<?= $block->escapeJsQuote(__('Authenticity verification in progress...'), '"') ?>",
-                "keepFocus": "<?= $block->escapeJsQuote(__('Hold the camera steady and keep the QR code in focus.'), '"') ?>",
-                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Please try again.'), '"') ?>",
-                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '"') ?>",
-                "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('You are performing a product authenticity check. Please enter the system verification code shown below to continue.'), '"') ?>",
-                "secondVerifyInvalid": "<?= $block->escapeJsQuote(__('The verification code you entered is incorrect. Please try again.'), '"') ?>",
-                "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '"') ?>",
-                "secondVerifyUnavailable": "<?= $block->escapeJsQuote(__('Secondary verification is currently unavailable. Please refresh and try again.'), '"') ?>",
-                "pendingVerification": "<?= $block->escapeJsQuote(__('Please complete the secondary verification below before we verify this product authenticity code.'), '"') ?>"
+                "desktopGuide": "<?= $block->escapeJsQuote(__('Use your mobile phone camera to scan the authenticity QR code on the product package.'), '\"') ?>",
+                "noCameraApi": "<?= $block->escapeJsQuote(__('This device cannot access a camera. Please open this page on a mobile phone and scan the authenticity QR code.'), '\"') ?>",
+                "loadingFallback": "<?= $block->escapeJsQuote(__('Preparing the QR scanner...'), '\"') ?>",
+                "noFallbackScanner": "<?= $block->escapeJsQuote(__('Unable to initialize the QR scanner on this device. Please use a mobile phone camera instead.'), '\"') ?>",
+                "cameraDenied": "<?= $block->escapeJsQuote(__('Camera access is unavailable. Please allow camera access or use another mobile device to scan the authenticity QR code.'), '\"') ?>",
+                "scanning": "<?= $block->escapeJsQuote(__('Align the authenticity QR code within the frame. Verification will continue automatically after a successful scan.'), '\"') ?>",
+                "previewFailed": "<?= $block->escapeJsQuote(__('Unable to start the camera preview. Please try again or use another mobile device.'), '\"') ?>",
+                "successDetected": "<?= $block->escapeJsQuote(__('QR code detected. Starting authenticity verification...'), '\"') ?>",
+                "successSubmitting": "<?= $block->escapeJsQuote(__('Authenticity verification in progress...'), '\"') ?>",
+                "keepFocus": "<?= $block->escapeJsQuote(__('Hold the camera steady and keep the QR code in focus.'), '\"') ?>",
+                "scanFailedRetry": "<?= $block->escapeJsQuote(__('Scan canceled. Please try again.'), '\"') ?>",
+                "invalidQrDomain": "<?= $block->escapeJsQuote(__('Please scan the official authenticity QR code printed on the product packaging.'), '\"') ?>",
+                "secondVerifyPrompt": "<?= $block->escapeJsQuote(__('You are performing a product authenticity check. Please enter the system verification code shown below to continue.'), '\"') ?>",
+                "secondVerifyInvalid": "<?= $block->escapeJsQuote(__('The verification code you entered is incorrect. Please try again.'), '\"') ?>",
+                "secondVerifyCancelled": "<?= $block->escapeJsQuote(__('Verification canceled. Authenticity verification was not performed.'), '\"') ?>",
+                "secondVerifyUnavailable": "<?= $block->escapeJsQuote(__('Secondary verification is currently unavailable. Please refresh and try again.'), '\"') ?>",
+                "pendingVerification": "<?= $block->escapeJsQuote(__('Please complete the secondary verification below before we verify this product authenticity code.'), '\"') ?>",
+                "performingVerification": "<?= $block->escapeJsQuote(__('Completing authenticity verification...'), '\"') ?>",
+                "verificationExpired": "<?= $block->escapeJsQuote(__('Secondary verification expired. Please complete verification again.'), '\"') ?>",
+                "verificationTryAgain": "<?= $block->escapeJsQuote(__('We could not complete verification. Please try again.'), '\"') ?>"
             }
         }
     }
