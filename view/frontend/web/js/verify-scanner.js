@@ -226,10 +226,10 @@ define(['require'], function (require) {
         /* fallback 的真实解码区域比 html5 scan region 再外扩一点 */
         var IOS_DECODE_PADDING_RATIO = 0.06;
         var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
-        var IOS_FALLBACK_START_DELAY_MS = 12000;
-        var IOS_FALLBACK_INTERVAL_MS = 1500;
-        var IOS_FALLBACK_HINT_DELAY_MS = 3500;
-        var IOS_FALLBACK_MAX_ATTEMPTS = 2;
+        var IOS_FALLBACK_START_DELAY_MS = 15000;
+        var IOS_FALLBACK_INTERVAL_MS = 1800;
+        var IOS_FALLBACK_HINT_DELAY_MS = 4000;
+        var IOS_FALLBACK_MAX_ATTEMPTS = 1;
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -261,6 +261,9 @@ define(['require'], function (require) {
         var html5StartPromise = null;
         var html5ScannerState = 'idle';
         var html5PatchTimers = [];
+
+        var iosQrScannerInstance = null;
+        var iosQrScannerVideo = null;
         var iosFallbackScanTimer = null;
         var iosFallbackHintTimer = null;
         var iosFallbackScanActive = false;
@@ -912,7 +915,52 @@ define(['require'], function (require) {
             };
         };
 
+        var getIosQrScannerSourceRegion = function (videoWidth, videoHeight) {
+            if (!videoWidth || !videoHeight) {
+                return null;
+            }
+
+            var edge = Math.floor(Math.min(videoWidth, videoHeight) * IOS_QRBOX_RATIO);
+            edge = Math.max(320, Math.min(720, edge));
+
+            var x = Math.floor((videoWidth - edge) / 2);
+            var y = Math.floor((videoHeight - edge) / 2);
+
+            return {
+                x: x,
+                y: y,
+                width: edge,
+                height: edge,
+                downScaledWidth: 480,
+                downScaledHeight: 480
+            };
+        };
+
         var getIosActualScanRegionRect = function () {
+            var activeVideo = getActiveScannerVideoElement();
+            var displayedVideoRect = activeVideo ? getDisplayedVideoContentRect(activeVideo) : null;
+
+            if (activeVideo && displayedVideoRect && iosQrScannerInstance) {
+                var sourceRegion = getIosQrScannerSourceRegion(
+                    activeVideo.videoWidth || 0,
+                    activeVideo.videoHeight || 0
+                );
+
+                if (sourceRegion) {
+                    var scaleX = displayedVideoRect.width / activeVideo.videoWidth;
+                    var scaleY = displayedVideoRect.height / activeVideo.videoHeight;
+
+                    return {
+                        left: displayedVideoRect.left + (sourceRegion.x * scaleX),
+                        top: displayedVideoRect.top + (sourceRegion.y * scaleY),
+                        width: sourceRegion.width * scaleX,
+                        height: sourceRegion.height * scaleY,
+                        right: displayedVideoRect.left + ((sourceRegion.x + sourceRegion.width) * scaleX),
+                        bottom: displayedVideoRect.top + ((sourceRegion.y + sourceRegion.height) * scaleY)
+                    };
+                }
+            }
+
             var scanRegion = getIosScanRegionElement();
             var scanRegionRect = getRectFromElement(scanRegion);
 
@@ -1219,6 +1267,41 @@ define(['require'], function (require) {
             });
         };
 
+        var stopIosQrScanner = function () {
+            if (!iosQrScannerInstance) {
+                if (!html5Scanner) {
+                    hideIosOverlay();
+                }
+                iosQrScannerVideo = null;
+                return Promise.resolve();
+            }
+
+            debugLog('iosScan:stopQrScanner', {
+                sessionId: currentScanDebugSessionId,
+                hasScanner: !!iosQrScannerInstance
+            });
+
+            var scanner = iosQrScannerInstance;
+            iosQrScannerInstance = null;
+            iosQrScannerVideo = null;
+
+            return Promise.resolve().then(function () {
+                if (typeof scanner.destroy === 'function') {
+                    return scanner.destroy();
+                }
+
+                if (typeof scanner.stop === 'function') {
+                    return scanner.stop();
+                }
+            }).catch(function () {
+                // Ignore stop/destroy errors.
+            }).then(function () {
+                if (!html5Scanner) {
+                    hideIosOverlay();
+                }
+            });
+        };
+
         var stopHtml5Scanner = function () {
             debugLog('iosScan:stopHtml5Scanner', {
                 sessionId: currentScanDebugSessionId,
@@ -1231,7 +1314,9 @@ define(['require'], function (require) {
             resetIosPinchState();
 
             if (!html5Scanner) {
-                hideIosOverlay();
+                if (!iosQrScannerInstance) {
+                    hideIosOverlay();
+                }
                 html5ScannerState = 'idle';
                 html5StartPromise = null;
                 return Promise.resolve();
@@ -1256,7 +1341,9 @@ define(['require'], function (require) {
                         html5Scanner = null;
                         html5ScannerState = 'idle';
                         html5StartPromise = null;
-                        hideIosOverlay();
+                        if (!iosQrScannerInstance) {
+                            hideIosOverlay();
+                        }
                         return;
                     }
 
@@ -1274,7 +1361,9 @@ define(['require'], function (require) {
                         html5Scanner = null;
                         html5ScannerState = 'idle';
                         html5StartPromise = null;
-                        hideIosOverlay();
+                        if (!iosQrScannerInstance) {
+                            hideIosOverlay();
+                        }
                     });
                 });
             }
@@ -1291,7 +1380,9 @@ define(['require'], function (require) {
                 html5Scanner = null;
                 html5ScannerState = 'idle';
                 html5StartPromise = null;
-                hideIosOverlay();
+                if (!iosQrScannerInstance) {
+                    hideIosOverlay();
+                }
                 return Promise.resolve();
             }
 
@@ -1309,7 +1400,9 @@ define(['require'], function (require) {
                 html5Scanner = null;
                 html5ScannerState = 'idle';
                 html5StartPromise = null;
-                hideIosOverlay();
+                if (!iosQrScannerInstance) {
+                    hideIosOverlay();
+                }
             });
         };
 
@@ -1339,6 +1432,7 @@ define(['require'], function (require) {
             stopMediaStream(stream);
             stream = null;
 
+            stopIosQrScanner();
             stopHtml5Scanner();
 
             try {
@@ -2620,6 +2714,119 @@ define(['require'], function (require) {
             return qrConfig;
         };
 
+        var startIosQrScanner = async function (sessionId) {
+            await ensureQrScannerLoaded();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            await stopIosQrScanner();
+            await stopHtml5Scanner();
+
+            if (sessionId !== openSessionId) {
+                return;
+            }
+
+            ensureIosOverlay();
+            showIosOverlay();
+
+            iosOverlayCameraRoot.innerHTML = '';
+
+            iosQrScannerVideo = document.createElement('video');
+            iosQrScannerVideo.setAttribute('playsinline', 'true');
+            iosQrScannerVideo.setAttribute('webkit-playsinline', 'true');
+            iosQrScannerVideo.setAttribute('autoplay', 'true');
+            iosQrScannerVideo.setAttribute('muted', 'true');
+            iosQrScannerVideo.playsInline = true;
+            iosQrScannerVideo.muted = true;
+            iosQrScannerVideo.autoplay = true;
+            iosQrScannerVideo.controls = false;
+            iosQrScannerVideo.style.position = 'absolute';
+            iosQrScannerVideo.style.left = '0';
+            iosQrScannerVideo.style.top = '0';
+            iosQrScannerVideo.style.width = '100%';
+            iosQrScannerVideo.style.height = '100%';
+            iosQrScannerVideo.style.objectFit = 'cover';
+            iosQrScannerVideo.style.background = '#000';
+            iosQrScannerVideo.style.display = 'block';
+            iosQrScannerVideo.style.visibility = 'visible';
+            iosQrScannerVideo.style.opacity = '1';
+
+            iosOverlayCameraRoot.appendChild(iosQrScannerVideo);
+
+            var scannerStartAt = Date.now();
+            debugLog('iosScan:qrScannerStart:begin', {
+                sessionId: currentScanDebugSessionId
+            });
+
+            iosQrScannerInstance = new window.QrScanner(
+                iosQrScannerVideo,
+                function (result) {
+                    if (sessionId !== openSessionId || isFinishingScan) {
+                        return;
+                    }
+
+                    var qrValue = '';
+                    if (typeof result === 'string') {
+                        qrValue = result;
+                    } else if (result && result.data) {
+                        qrValue = result.data;
+                    }
+
+                    qrValue = String(qrValue || '').trim();
+                    if (!qrValue) {
+                        return;
+                    }
+
+                    currentScanDecodeSource = 'ios-qr-scanner';
+
+                    debugLog('iosScan:qrScannerDecodeSuccess', {
+                        sessionId: currentScanDebugSessionId,
+                        elapsedMs: getCurrentScanElapsedMs(),
+                        qrValue: qrValue
+                    });
+
+                    finalizeSuccessfulScan(qrValue, sessionId);
+                },
+                {
+                    preferredCamera: 'environment',
+                    maxScansPerSecond: 8,
+                    returnDetailedScanResult: true,
+                    highlightScanRegion: false,
+                    highlightCodeOutline: false,
+                    calculateScanRegion: function (video) {
+                        return getIosQrScannerSourceRegion(
+                            video.videoWidth || 0,
+                            video.videoHeight || 0
+                        );
+                    },
+                    onDecodeError: function () {
+                        // Ignore per-frame misses.
+                    }
+                }
+            );
+
+            await iosQrScannerInstance.start();
+
+            debugLog('iosScan:qrScannerStart:success', {
+                sessionId: currentScanDebugSessionId,
+                elapsedMs: Date.now() - scannerStartAt
+            });
+
+            patchIosHtml5Preview();
+            scheduleIosHtml5Patches();
+            resetIosPinchState();
+
+            window.setTimeout(function () {
+                if (sessionId !== openSessionId || !iosQrScannerInstance) {
+                    return;
+                }
+
+                applyIosTrackZoomFactor(1);
+            }, 180);
+        };
+
         var startIosHtml5QrcodeScanner = async function (sessionId) {
             await ensureHtml5QrcodeLoaded();
 
@@ -2733,6 +2940,7 @@ define(['require'], function (require) {
         scanTrigger.addEventListener('click', async function () {
             closeScanner({syncHistory: false, invalidateSession: true});
             resetFallbackSessionState();
+            await stopIosQrScanner();
             await stopHtml5Scanner();
             beginScanDebugSession({
                 source: 'scanTrigger.click',
@@ -2767,14 +2975,26 @@ define(['require'], function (require) {
                 setMessage(messages.scanning, false);
 
                 try {
-                    await startIosHtml5QrcodeScanner(sessionId);
-                } catch (iosStartError) {
-                    if (sessionId !== openSessionId) {
-                        return;
-                    }
+                    await startIosQrScanner(sessionId);
+                } catch (iosPrimaryStartError) {
+                    debugLog('iosScan:qrScannerPrimaryFailed', {
+                        sessionId: currentScanDebugSessionId,
+                        message: iosPrimaryStartError && iosPrimaryStartError.message
+                            ? iosPrimaryStartError.message
+                            : String(iosPrimaryStartError)
+                    });
 
-                    closeScanner({syncHistory: true, invalidateSession: true});
-                    setMessage(messages.previewFailed, true);
+                    try {
+                        await stopIosQrScanner();
+                        await startIosHtml5QrcodeScanner(sessionId);
+                    } catch (iosFallbackStartError) {
+                        if (sessionId !== openSessionId) {
+                            return;
+                        }
+
+                        closeScanner({syncHistory: true, invalidateSession: true});
+                        setMessage(messages.previewFailed, true);
+                    }
                 }
 
                 return;
