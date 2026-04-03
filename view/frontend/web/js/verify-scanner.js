@@ -247,7 +247,7 @@ define(['require'], function (require) {
         }
 
         var assetUrls = {
-            qrScannerWorker: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner-worker.min.js'),
+            qrScannerModule: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
             html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
             zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
         };
@@ -2116,7 +2116,6 @@ define(['require'], function (require) {
 
         var ensureQrScannerLoaded = async function () {
             if (qrScannerCtor && typeof qrScannerCtor.scanImage === 'function') {
-                window.QrScanner = qrScannerCtor;
                 activeFallback = {
                     name: 'qr-scanner'
                 };
@@ -2127,39 +2126,28 @@ define(['require'], function (require) {
                 throw new Error('qr-scanner disabled because of prior load/init failure');
             }
 
-            return new Promise(function (resolve, reject) {
-                require(
-                    ['Pynarae_Verify/js/vendor/qr-scanner-loader'],
-                    function (QrScannerModule) {
-                        var QrScannerResolved = QrScannerModule && (
-                            QrScannerModule.default ||
-                            QrScannerModule ||
-                            window.QrScanner ||
-                            null
-                        );
-
-                        if (!QrScannerResolved || typeof QrScannerResolved.scanImage !== 'function') {
-                            markDetectorLoadFailure('qr-scanner');
-                            reject(new Error('QrScanner did not initialize correctly'));
-                            return;
-                        }
-
-                        QrScannerResolved.WORKER_PATH = assetUrls.qrScannerWorker;
-                        qrScannerCtor = QrScannerResolved;
-                        window.QrScanner = QrScannerResolved;
-
-                        activeFallback = {
-                            name: 'qr-scanner'
-                        };
-
-                        resolve(activeFallback);
-                    },
-                    function (error) {
-                        markDetectorLoadFailure('qr-scanner');
-                        reject(error || new Error('Failed to load qr-scanner module'));
-                    }
+            try {
+                var qrScannerModule = await import(assetUrls.qrScannerModule);
+                var QrScannerResolved = qrScannerModule && (
+                    qrScannerModule.default ||
+                    qrScannerModule
                 );
-            });
+
+                if (!QrScannerResolved || typeof QrScannerResolved.scanImage !== 'function') {
+                    markDetectorLoadFailure('qr-scanner');
+                    throw new Error('QrScanner did not initialize correctly');
+                }
+
+                qrScannerCtor = QrScannerResolved;
+                activeFallback = {
+                    name: 'qr-scanner'
+                };
+
+                return activeFallback;
+            } catch (error) {
+                markDetectorLoadFailure('qr-scanner');
+                throw error;
+            }
         };
 
         var ensureHtml5QrcodeLoaded = async function () {
@@ -2372,7 +2360,13 @@ define(['require'], function (require) {
 
             if (fallback.name === 'qr-scanner') {
                 try {
-                    var qrScannerResult = await window.QrScanner.scanImage(frameCanvas, {
+                    var qrScannerApi = qrScannerCtor || window.QrScanner;
+
+                    if (!qrScannerApi || typeof qrScannerApi.scanImage !== 'function') {
+                        throw new Error('QrScanner API is unavailable');
+                    }
+
+                    var qrScannerResult = await qrScannerApi.scanImage(frameCanvas, {
                         returnDetailedScanResult: true
                     });
 
