@@ -261,6 +261,7 @@ define(['require'], function (require) {
         var html5StartPromise = null;
         var html5ScannerState = 'idle';
         var html5PatchTimers = [];
+        var closeScannerQueue = Promise.resolve();
 
         var iosQrScannerInstance = null;
         var iosQrScannerVideo = null;
@@ -1408,49 +1409,55 @@ define(['require'], function (require) {
 
         var closeScanner = function (options) {
             var closeOptions = options || {};
-            debugLog('scan:closeScanner', {
-                sessionId: currentScanDebugSessionId,
-                options: closeOptions,
-                scannerHistoryActive: scannerHistoryActive,
-                isScannerOpen: isScannerOpen,
-                decodeSource: currentScanDecodeSource,
-                fallbackAttempts: currentScanFallbackAttempts
+            closeScannerQueue = closeScannerQueue.catch(function () {
+                // Ignore prior close errors and continue queue.
+            }).then(async function () {
+                debugLog('scan:closeScanner', {
+                    sessionId: currentScanDebugSessionId,
+                    options: closeOptions,
+                    scannerHistoryActive: scannerHistoryActive,
+                    isScannerOpen: isScannerOpen,
+                    decodeSource: currentScanDecodeSource,
+                    fallbackAttempts: currentScanFallbackAttempts
+                });
+
+                clearIosFallbackScan();
+
+                if (closeOptions.invalidateSession) {
+                    invalidateOpenSession();
+                }
+
+                clearTimers();
+
+                isFinishingScan = false;
+                isScannerOpen = false;
+                isDetectingFrame = false;
+
+                stopMediaStream(stream);
+                stream = null;
+
+                await stopIosQrScanner();
+                await stopHtml5Scanner();
+
+                try {
+                    scanVideo.pause();
+                } catch (e) {
+                    // Ignore pause errors.
+                }
+
+                scanVideo.srcObject = null;
+                scanVideo.hidden = false;
+                scanModal.hidden = true;
+                document.body.classList.remove('pynarae-verify--scanner-open');
+                hideIosOverlay();
+
+                if (closeOptions.syncHistory !== false && scannerHistoryActive) {
+                    scannerHistoryActive = false;
+                    window.history.back();
+                }
             });
 
-            clearIosFallbackScan();
-
-            if (closeOptions.invalidateSession) {
-                invalidateOpenSession();
-            }
-
-            clearTimers();
-
-            isFinishingScan = false;
-            isScannerOpen = false;
-            isDetectingFrame = false;
-
-            stopMediaStream(stream);
-            stream = null;
-
-            stopIosQrScanner();
-            stopHtml5Scanner();
-
-            try {
-                scanVideo.pause();
-            } catch (e) {
-                // Ignore pause errors.
-            }
-
-            scanVideo.srcObject = null;
-            scanVideo.hidden = false;
-            scanModal.hidden = true;
-            document.body.classList.remove('pynarae-verify--scanner-open');
-            hideIosOverlay();
-
-            if (closeOptions.syncHistory !== false && scannerHistoryActive) {
-                scannerHistoryActive = false;
-                window.history.back();
-            }
+            return closeScannerQueue;
         };
 
         var syncScannerHistoryFlag = function () {
@@ -2360,7 +2367,7 @@ define(['require'], function (require) {
 
             if (fallback.name === 'qr-scanner') {
                 try {
-                    var qrScannerApi = qrScannerCtor || window.QrScanner;
+                    var qrScannerApi = qrScannerCtor;
 
                     if (!qrScannerApi || typeof qrScannerApi.scanImage !== 'function') {
                         throw new Error('QrScanner API is unavailable');
@@ -2780,7 +2787,7 @@ define(['require'], function (require) {
                 sessionId: currentScanDebugSessionId
             });
 
-            var QrScannerResolved = qrScannerCtor || window.QrScanner;
+            var QrScannerResolved = qrScannerCtor;
 
             if (!QrScannerResolved || typeof QrScannerResolved !== 'function') {
                 throw new Error('QrScanner constructor is unavailable');
