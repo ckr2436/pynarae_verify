@@ -38,6 +38,7 @@ define(['require'], function (require) {
             currentUrl.searchParams.get('code') ||
             ''
         ).trim();
+        var activeVerificationCode = codeFromUrl || submittedCode;
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
         var challengeCreateUrl = (scannerRoot.getAttribute('data-challenge-create-url') || '').trim();
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
@@ -126,6 +127,52 @@ define(['require'], function (require) {
             scanMessage.classList.toggle('pynarae-verify__scanner-message--error', Boolean(isError));
         };
 
+        var hideSecondaryVerificationEntry = function () {
+            if (startSecondaryButton) {
+                startSecondaryButton.hidden = true;
+                startSecondaryButton.disabled = false;
+                startSecondaryButton.style.display = 'none';
+                startSecondaryButton.setAttribute('aria-hidden', 'true');
+            }
+
+            if (pendingPanel) {
+                pendingPanel.hidden = true;
+                pendingPanel.style.display = 'none';
+                pendingPanel.setAttribute('aria-hidden', 'true');
+            }
+
+            if (pendingDetails) {
+                pendingDetails.hidden = true;
+                pendingDetails.style.display = 'none';
+                pendingDetails.setAttribute('aria-hidden', 'true');
+            }
+        };
+
+        var showSecondaryVerificationEntry = function () {
+            if (!activeVerificationCode) {
+                return;
+            }
+
+            if (startSecondaryButton) {
+                startSecondaryButton.hidden = false;
+                startSecondaryButton.disabled = false;
+                startSecondaryButton.style.display = '';
+                startSecondaryButton.removeAttribute('aria-hidden');
+            }
+
+            if (pendingPanel) {
+                pendingPanel.hidden = false;
+                pendingPanel.style.display = '';
+                pendingPanel.removeAttribute('aria-hidden');
+            }
+
+            if (pendingDetails) {
+                pendingDetails.hidden = false;
+                pendingDetails.style.display = '';
+                pendingDetails.removeAttribute('aria-hidden');
+            }
+        };
+
         var setResultCssClass = function (status) {
             var cssClass = 'pynarae-verify__result pynarae-verify__result--notice';
 
@@ -194,18 +241,7 @@ define(['require'], function (require) {
                 detailsContainer.hidden = true;
             }
 
-            if (startSecondaryButton) {
-                startSecondaryButton.hidden = false;
-                startSecondaryButton.disabled = false;
-            }
-
-            if (pendingPanel) {
-                pendingPanel.hidden = false;
-            }
-
-            if (pendingDetails) {
-                pendingDetails.hidden = false;
-            }
+            showSecondaryVerificationEntry();
 
             focusResultPanel();
         };
@@ -245,18 +281,8 @@ define(['require'], function (require) {
                 detailsContainer.hidden = false;
             }
 
-            if (startSecondaryButton) {
-                startSecondaryButton.hidden = true;
-                startSecondaryButton.disabled = false;
-            }
-
-            if (pendingPanel) {
-                pendingPanel.hidden = true;
-            }
-
-            if (pendingDetails) {
-                pendingDetails.hidden = true;
-            }
+            hideSecondaryVerificationEntry();
+            setMessage('', false);
 
             focusResultPanel();
         };
@@ -1293,18 +1319,19 @@ define(['require'], function (require) {
                 return;
             }
 
-            await startSecondaryVerificationFlow(parsedResult.code);
+            activeVerificationCode = String(parsedResult.code || '').trim();
+            await startSecondaryVerificationFlow(activeVerificationCode);
         };
 
         var autoStartSecondaryVerificationIfNeeded = function () {
-            if (!codeFromUrl || hasAutoStartedSecondaryVerification) {
+            if (!activeVerificationCode || !codeFromUrl || hasAutoStartedSecondaryVerification) {
                 return;
             }
 
             hasAutoStartedSecondaryVerification = true;
 
             window.setTimeout(function () {
-                startSecondaryVerificationFlow(codeFromUrl);
+                startSecondaryVerificationFlow(activeVerificationCode);
             }, 150);
         };
 
@@ -1320,7 +1347,7 @@ define(['require'], function (require) {
 
         if (startSecondaryButton) {
             startSecondaryButton.addEventListener('click', async function () {
-                await startSecondaryVerificationFlow(codeFromUrl || submittedCode);
+                await startSecondaryVerificationFlow(activeVerificationCode);
             });
         }
 
@@ -1834,7 +1861,8 @@ define(['require'], function (require) {
                             return;
                         }
 
-                        closeScanner({syncHistory: true, invalidateSession: true});
+                        scannerHistoryActive = false;
+                        closeScanner({syncHistory: false, invalidateSession: true});
                         submitScannedCode(qrValue, allowedHosts);
                     }, 650);
 
@@ -1954,7 +1982,8 @@ define(['require'], function (require) {
                         return;
                     }
 
-                    closeScanner({syncHistory: true, invalidateSession: true});
+                    scannerHistoryActive = false;
+                    closeScanner({syncHistory: false, invalidateSession: true});
                     submitScannedCode(qrValue, allowedHosts);
                 }, 650);
             };
