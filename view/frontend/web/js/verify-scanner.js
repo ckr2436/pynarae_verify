@@ -2038,11 +2038,28 @@ define(['require'], function (require) {
                 return null;
             }
 
-            var sorted = cameras.slice().sort(function (a, b) {
-                return getIosCameraScore(b) - getIosCameraScore(a);
+            var scoredCameras = cameras.map(function (camera) {
+                return {
+                    id: camera && camera.id,
+                    score: getIosCameraScore(camera)
+                };
             });
 
-            return sorted[0] ? sorted[0].id : null;
+            var topScore = scoredCameras.reduce(function (best, camera) {
+                return Math.max(best, camera.score);
+            }, -Infinity);
+
+            // When labels are missing/ambiguous, camera scores are often 0.
+            // Returning null preserves the facingMode:"environment" fallback.
+            if (!isFinite(topScore) || topScore <= 0) {
+                return null;
+            }
+
+            scoredCameras.sort(function (a, b) {
+                return b.score - a.score;
+            });
+
+            return scoredCameras[0] ? scoredCameras[0].id : null;
         };
 
         var getHtml5CameraSource = async function () {
