@@ -194,6 +194,7 @@ define(['require'], function (require) {
         var detector = null;
         var activeFallback = null;
         var fallbackLoader = null;
+        var qrScannerCtor = null;
         var qrCanvas = null;
         var qrContext = null;
         var fallbackStatusMessageShown = false;
@@ -246,7 +247,6 @@ define(['require'], function (require) {
         }
 
         var assetUrls = {
-            qrScanner: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
             qrScannerWorker: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner-worker.min.js'),
             html5Qrcode: require.toUrl('Pynarae_Verify/lib/html5-qrcode/html5-qrcode.min.js'),
             zxing: require.toUrl('Pynarae_Verify/lib/zxing/index.min.js')
@@ -2115,25 +2115,51 @@ define(['require'], function (require) {
         };
 
         var ensureQrScannerLoaded = async function () {
+            if (qrScannerCtor && typeof qrScannerCtor.scanImage === 'function') {
+                window.QrScanner = qrScannerCtor;
+                activeFallback = {
+                    name: 'qr-scanner'
+                };
+                return activeFallback;
+            }
+
             if (!isFallbackAvailable('qr-scanner')) {
                 throw new Error('qr-scanner disabled because of prior load/init failure');
             }
 
-            if (!window.QrScanner || typeof window.QrScanner.scanImage !== 'function') {
-                await loadScript(assetUrls.qrScanner);
-            }
+            return new Promise(function (resolve, reject) {
+                require(
+                    ['Pynarae_Verify/js/vendor/qr-scanner-loader'],
+                    function (QrScannerModule) {
+                        var QrScannerResolved = QrScannerModule && (
+                            QrScannerModule.default ||
+                            QrScannerModule ||
+                            window.QrScanner ||
+                            null
+                        );
 
-            if (!window.QrScanner || typeof window.QrScanner.scanImage !== 'function') {
-                throw new Error('QrScanner did not initialize correctly');
-            }
+                        if (!QrScannerResolved || typeof QrScannerResolved.scanImage !== 'function') {
+                            markDetectorLoadFailure('qr-scanner');
+                            reject(new Error('QrScanner did not initialize correctly'));
+                            return;
+                        }
 
-            window.QrScanner.WORKER_PATH = assetUrls.qrScannerWorker;
+                        QrScannerResolved.WORKER_PATH = assetUrls.qrScannerWorker;
+                        qrScannerCtor = QrScannerResolved;
+                        window.QrScanner = QrScannerResolved;
 
-            activeFallback = {
-                name: 'qr-scanner'
-            };
+                        activeFallback = {
+                            name: 'qr-scanner'
+                        };
 
-            return activeFallback;
+                        resolve(activeFallback);
+                    },
+                    function (error) {
+                        markDetectorLoadFailure('qr-scanner');
+                        reject(error || new Error('Failed to load qr-scanner module'));
+                    }
+                );
+            });
         };
 
         var ensureHtml5QrcodeLoaded = async function () {
@@ -2760,7 +2786,13 @@ define(['require'], function (require) {
                 sessionId: currentScanDebugSessionId
             });
 
-            iosQrScannerInstance = new window.QrScanner(
+            var QrScannerResolved = qrScannerCtor || window.QrScanner;
+
+            if (!QrScannerResolved || typeof QrScannerResolved !== 'function') {
+                throw new Error('QrScanner constructor is unavailable');
+            }
+
+            iosQrScannerInstance = new QrScannerResolved(
                 iosQrScannerVideo,
                 function (result) {
                     if (sessionId !== openSessionId || isFinishingScan) {
