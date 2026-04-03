@@ -1407,7 +1407,7 @@ define(['require'], function (require) {
             });
         };
 
-        var closeScanner = function (options) {
+        var closeScanner = async function (options) {
             var closeOptions = options || {};
             closeScannerQueue = closeScannerQueue.catch(function () {
                 // Ignore prior close errors and continue queue.
@@ -1457,7 +1457,7 @@ define(['require'], function (require) {
                 }
             });
 
-            return closeScannerQueue;
+            await closeScannerQueue;
         };
 
         var syncScannerHistoryFlag = function () {
@@ -2367,7 +2367,7 @@ define(['require'], function (require) {
 
             if (fallback.name === 'qr-scanner') {
                 try {
-                    var qrScannerApi = qrScannerCtor;
+                    var qrScannerApi = qrScannerCtor || window.QrScanner;
 
                     if (!qrScannerApi || typeof qrScannerApi.scanImage !== 'function') {
                         throw new Error('QrScanner API is unavailable');
