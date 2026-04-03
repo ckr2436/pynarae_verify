@@ -66,6 +66,7 @@ define(['require'], function (require) {
         var messages = config.messages || {};
         var startSecondaryInProgress = false;
         var hasAutoStartedSecondaryVerification = false;
+        var pendingSuccessfulScanPayload = null;
 
         var detector = null;
         var activeFallback = null;
@@ -1333,6 +1334,17 @@ define(['require'], function (require) {
             await startSecondaryVerificationFlow(activeVerificationCode);
         };
 
+        var continuePendingSuccessfulScan = function () {
+            if (!pendingSuccessfulScanPayload) {
+                return;
+            }
+
+            var payload = pendingSuccessfulScanPayload;
+            pendingSuccessfulScanPayload = null;
+
+            submitScannedCode(payload.qrValue, payload.allowedHosts);
+        };
+
         var autoStartSecondaryVerificationIfNeeded = function () {
             if (!activeVerificationCode || !codeFromUrl || hasAutoStartedSecondaryVerification) {
                 return;
@@ -1871,8 +1883,18 @@ define(['require'], function (require) {
                             return;
                         }
 
-                        closeScanner({syncHistory: true, invalidateSession: true});
-                        submitScannedCode(qrValue, allowedHosts);
+                        var shouldSyncHistory = scannerHistoryActive === true;
+
+                        pendingSuccessfulScanPayload = {
+                            qrValue: qrValue,
+                            allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
+                        };
+
+                        closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
+
+                        if (!shouldSyncHistory) {
+                            continuePendingSuccessfulScan();
+                        }
                     }, 650);
 
                     return;
@@ -1991,8 +2013,18 @@ define(['require'], function (require) {
                         return;
                     }
 
-                    closeScanner({syncHistory: true, invalidateSession: true});
-                    submitScannedCode(qrValue, allowedHosts);
+                    var shouldSyncHistory = scannerHistoryActive === true;
+
+                    pendingSuccessfulScanPayload = {
+                        qrValue: qrValue,
+                        allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
+                    };
+
+                    closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
+
+                    if (!shouldSyncHistory) {
+                        continuePendingSuccessfulScan();
+                    }
                 }, 650);
             };
 
@@ -2200,6 +2232,11 @@ define(['require'], function (require) {
         });
 
         window.addEventListener('popstate', function () {
+            if (pendingSuccessfulScanPayload) {
+                continuePendingSuccessfulScan();
+                return;
+            }
+
             if (!isScannerOpen) {
                 return;
             }
