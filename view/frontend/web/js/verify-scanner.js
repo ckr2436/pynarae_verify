@@ -1861,8 +1861,7 @@ define(['require'], function (require) {
                             return;
                         }
 
-                        scannerHistoryActive = false;
-                        closeScanner({syncHistory: false, invalidateSession: true});
+                        closeScanner({syncHistory: true, invalidateSession: true});
                         submitScannedCode(qrValue, allowedHosts);
                     }, 650);
 
@@ -1982,8 +1981,7 @@ define(['require'], function (require) {
                         return;
                     }
 
-                    scannerHistoryActive = false;
-                    closeScanner({syncHistory: false, invalidateSession: true});
+                    closeScanner({syncHistory: true, invalidateSession: true});
                     submitScannedCode(qrValue, allowedHosts);
                 }, 650);
             };
@@ -2046,8 +2044,10 @@ define(['require'], function (require) {
                 scanVideo.hidden = true;
                 isScannerOpen = true;
                 document.body.classList.add('pynarae-verify--scanner-open');
-                window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
-                scannerHistoryActive = true;
+                if (!scannerHistoryActive) {
+                    window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+                    scannerHistoryActive = true;
+                }
                 setMessage(messages.scanning, false);
 
                 try {
@@ -2125,8 +2125,10 @@ define(['require'], function (require) {
             bindScanModalPinchZoomListeners();
             isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
-            window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
-            scannerHistoryActive = true;
+            if (!scannerHistoryActive) {
+                window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+                scannerHistoryActive = true;
+            }
             setMessage(messages.scanning, false);
 
             try {
