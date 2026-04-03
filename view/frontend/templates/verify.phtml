@@ -55,7 +55,6 @@ $introText = trim($block->getIntroText());
                  data-challenge-verify-url="<?= $block->escapeUrl($block->getChallengeVerifyUrl()) ?>"
                  data-perform-url="<?= $block->escapeUrl($block->getPerformUrl()) ?>"
                  data-secondary-token-param="<?= $block->escapeHtmlAttr(\Pynarae\Verify\Model\SecondaryVerificationManager::TOKEN_PARAM) ?>"
-                 data-form-key="<?= $block->escapeHtmlAttr($block->getFormKey()) ?>"
                  data-show-product-sku="<?= $block->shouldShowProductSku() ? '1' : '0' ?>"
                  data-show-batch-no="<?= $block->shouldShowBatchNo() ? '1' : '0' ?>"
                  data-show-scan-count="<?= $block->shouldShowScanCount() ? '1' : '0' ?>">

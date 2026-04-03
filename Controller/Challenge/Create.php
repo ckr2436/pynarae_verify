@@ -7,18 +7,19 @@ namespace Pynarae\Verify\Controller\Challenge;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\CsrfAwareActionInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Exception\LocalizedException;
 use Pynarae\Verify\Model\SecondaryVerificationManager;
 
-class Create extends Action implements HttpPostActionInterface
+class Create extends Action implements HttpPostActionInterface, CsrfAwareActionInterface
 {
     public function __construct(
         Context $context,
         private JsonFactory $resultJsonFactory,
-        private FormKeyValidator $formKeyValidator,
         private SecondaryVerificationManager $secondaryVerificationManager
     ) {
         parent::__construct($context);
@@ -26,14 +27,6 @@ class Create extends Action implements HttpPostActionInterface
 
     public function execute(): Json
     {
-        if (!$this->formKeyValidator->validate($this->getRequest())) {
-            return $this->jsonResponse([
-                'success' => false,
-                'code' => 'invalid_csrf',
-                'message' => (string)__('Your session has expired. Please refresh the page and try again.'),
-            ], 400);
-        }
-
         try {
             $challenge = $this->secondaryVerificationManager->issueChallenge();
 
@@ -56,6 +49,16 @@ class Create extends Action implements HttpPostActionInterface
                 'message' => (string)__('Secondary verification is currently unavailable. Please try again later.'),
             ], 503);
         }
+    }
+
+    public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
+    {
+        return null;
+    }
+
+    public function validateForCsrf(RequestInterface $request): ?bool
+    {
+        return true;
     }
 
     private function jsonResponse(array $data, int $statusCode = 200): Json
