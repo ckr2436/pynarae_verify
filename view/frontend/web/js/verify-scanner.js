@@ -39,6 +39,105 @@ define(['require'], function (require) {
             ''
         ).trim();
         var activeVerificationCode = codeFromUrl || submittedCode;
+        var debugEnabled = currentUrl.searchParams.get('verify_debug') === '1';
+        var debugPanel = null;
+        var debugPanelBody = null;
+        var debugMaxChars = 30000;
+
+        var debugSerialize = function (payload) {
+            if (typeof payload === 'undefined') {
+                return '';
+            }
+
+            if (payload === null) {
+                return 'null';
+            }
+
+            if (typeof payload === 'string') {
+                return payload;
+            }
+
+            try {
+                return JSON.stringify(payload, null, 2);
+            } catch (e) {
+                try {
+                    return String(payload);
+                } catch (stringifyError) {
+                    return '[unserializable payload]';
+                }
+            }
+        };
+
+        var ensureDebugPanel = function () {
+            if (!debugEnabled || debugPanel) {
+                return;
+            }
+
+            debugPanel = document.createElement('details');
+            debugPanel.open = true;
+            debugPanel.style.marginTop = '16px';
+            debugPanel.style.padding = '12px';
+            debugPanel.style.border = '1px solid #d9d9d9';
+            debugPanel.style.borderRadius = '12px';
+            debugPanel.style.background = '#fff';
+            debugPanel.style.boxShadow = '0 4px 12px rgba(0,0,0,.05)';
+
+            var summary = document.createElement('summary');
+            summary.textContent = 'Verify Debug Panel';
+            summary.style.cursor = 'pointer';
+            summary.style.fontWeight = '700';
+            summary.style.marginBottom = '10px';
+
+            debugPanelBody = document.createElement('pre');
+            debugPanelBody.style.margin = '10px 0 0';
+            debugPanelBody.style.whiteSpace = 'pre-wrap';
+            debugPanelBody.style.wordBreak = 'break-word';
+            debugPanelBody.style.fontSize = '12px';
+            debugPanelBody.style.lineHeight = '1.45';
+            debugPanelBody.style.maxHeight = '40vh';
+            debugPanelBody.style.overflow = 'auto';
+            debugPanelBody.style.background = '#0f172a';
+            debugPanelBody.style.color = '#e2e8f0';
+            debugPanelBody.style.padding = '12px';
+            debugPanelBody.style.borderRadius = '10px';
+
+            debugPanel.appendChild(summary);
+            debugPanel.appendChild(debugPanelBody);
+            scannerRoot.appendChild(debugPanel);
+        };
+
+        var debugLog = function (label, payload) {
+            if (!debugEnabled) {
+                return;
+            }
+
+            ensureDebugPanel();
+
+            var now = new Date();
+            var timeText = now.toISOString();
+            var message = '[' + timeText + '] ' + label;
+
+            var serialized = debugSerialize(payload);
+            if (serialized) {
+                message += '\n' + serialized;
+            }
+
+            if (debugPanelBody) {
+                debugPanelBody.textContent += (debugPanelBody.textContent ? '\n\n' : '') + message;
+
+                if (debugPanelBody.textContent.length > debugMaxChars) {
+                    debugPanelBody.textContent = debugPanelBody.textContent.slice(-debugMaxChars);
+                }
+
+                debugPanelBody.scrollTop = debugPanelBody.scrollHeight;
+            }
+
+            try {
+                console.log('[Pynarae Verify Debug]', label, payload || null);
+            } catch (e) {
+                // Ignore console errors.
+            }
+        };
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
         var challengeCreateUrl = (scannerRoot.getAttribute('data-challenge-create-url') || '').trim();
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
@@ -67,6 +166,19 @@ define(['require'], function (require) {
         var startSecondaryInProgress = false;
         var hasAutoStartedSecondaryVerification = false;
         var pendingSuccessfulScanPayload = null;
+
+
+        if (debugEnabled) {
+            ensureDebugPanel();
+            debugLog('init', {
+                href: window.location.href,
+                codeParamName: codeParamName,
+                submittedCode: submittedCode,
+                codeFromUrl: codeFromUrl,
+                activeVerificationCode: activeVerificationCode,
+                userAgent: navigator.userAgent
+            });
+        }
 
         var detector = null;
         var activeFallback = null;
@@ -977,6 +1089,14 @@ define(['require'], function (require) {
         };
 
         var requestServerChallenge = async function () {
+            debugLog('requestServerChallenge:start', {
+                challengeCreateUrl: challengeCreateUrl,
+                hasFormKey: !!formKey,
+                activeVerificationCode: activeVerificationCode,
+                scannerHistoryActive: scannerHistoryActive,
+                pendingSuccessfulScanPayload: !!pendingSuccessfulScanPayload
+            });
+
             if (!challengeCreateUrl) {
                 return {
                     success: false,
@@ -987,6 +1107,12 @@ define(['require'], function (require) {
             try {
                 var response = await postJson(challengeCreateUrl, {
                     form_key: formKey
+                });
+
+                debugLog('requestServerChallenge:response', {
+                    status: response.status,
+                    ok: response.ok,
+                    data: response.data
                 });
 
                 if (
@@ -1010,6 +1136,10 @@ define(['require'], function (require) {
                     challengeCode: String(response.data.challenge_code)
                 };
             } catch (e) {
+                debugLog('requestServerChallenge:error', {
+                    message: e && e.message ? e.message : String(e)
+                });
+
                 return {
                     success: false,
                     message: messages.secondVerifyUnavailable || messages.scanFailedRetry
@@ -1090,6 +1220,16 @@ define(['require'], function (require) {
         };
 
         var requestSecondVerification = async function (scannedCode) {
+            debugLog('requestSecondVerification:start', {
+                scannedCode: scannedCode,
+                hasConfirmModal: !!confirmModal,
+                hasConfirmGuide: !!confirmGuide,
+                hasConfirmCode: !!confirmCode,
+                hasConfirmInput: !!confirmInput,
+                hasConfirmSubmit: !!confirmSubmit,
+                hasConfirmCancel: !!confirmCancel
+            });
+
             if (
                 !confirmModal || !confirmGuide || !confirmCode || !confirmInput ||
                 !confirmError || !confirmSubmit || !confirmCancel
@@ -1102,6 +1242,8 @@ define(['require'], function (require) {
             }
 
             var challenge = await requestServerChallenge();
+            debugLog('requestSecondVerification:challengeResult', challenge);
+
             if (!challenge.success) {
                 setMessage(challenge.message || messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
                 return challenge;
@@ -1194,6 +1336,14 @@ define(['require'], function (require) {
         };
 
         var startSecondaryVerificationFlow = async function (code) {
+            debugLog('startSecondaryVerificationFlow:start', {
+                code: code,
+                activeVerificationCode: activeVerificationCode,
+                codeFromUrl: codeFromUrl,
+                submittedCode: submittedCode,
+                startSecondaryInProgress: startSecondaryInProgress
+            });
+
             var normalizedCode = String(code || '').trim();
             if (!normalizedCode) {
                 setMessage(messages.secondVerifyUnavailable || messages.scanFailedRetry, true);
@@ -1214,6 +1364,8 @@ define(['require'], function (require) {
                 setMessage(messages.pendingVerification || '', false);
 
                 var secondaryVerificationResult = await requestSecondVerification(normalizedCode);
+                debugLog('startSecondaryVerificationFlow:secondaryVerificationResult', secondaryVerificationResult);
+
                 if (!secondaryVerificationResult.success || !secondaryVerificationResult.token) {
                     return;
                 }
@@ -1221,6 +1373,8 @@ define(['require'], function (require) {
                 setMessage(messages.performingVerification || messages.successSubmitting || '', false);
 
                 var performResponse = await performVerification(normalizedCode, secondaryVerificationResult.token);
+                debugLog('startSecondaryVerificationFlow:performResponse', performResponse);
+
                 if (performResponse.success === true && performResponse.result) {
                     setMessage('', false);
                     renderVerificationResult(performResponse.result);
@@ -1335,13 +1489,17 @@ define(['require'], function (require) {
         };
 
         var continuePendingSuccessfulScan = function () {
+            debugLog('continuePendingSuccessfulScan:enter', pendingSuccessfulScanPayload);
+
             if (!pendingSuccessfulScanPayload) {
+                debugLog('continuePendingSuccessfulScan:skip-no-payload');
                 return;
             }
 
             var payload = pendingSuccessfulScanPayload;
             pendingSuccessfulScanPayload = null;
 
+            debugLog('continuePendingSuccessfulScan:submit', payload);
             submitScannedCode(payload.qrValue, payload.allowedHosts);
         };
 
@@ -1874,6 +2032,12 @@ define(['require'], function (require) {
                 }
 
                 if (qrValue) {
+                    debugLog('scanSuccess:runScanLoop', {
+                        qrValue: qrValue,
+                        allowedHosts: allowedHosts,
+                        scannerHistoryActive: scannerHistoryActive
+                    });
+
                     isFinishingScan = true;
                     clearTimers();
                     setMessage(messages.successDetected, false);
@@ -2002,6 +2166,12 @@ define(['require'], function (require) {
                 if (!qrValue) {
                     return;
                 }
+
+                debugLog('scanSuccess:iOS', {
+                    qrValue: qrValue,
+                    allowedHosts: allowedHosts,
+                    scannerHistoryActive: scannerHistoryActive
+                });
 
                 isFinishingScan = true;
                 clearTimers();
@@ -2232,6 +2402,13 @@ define(['require'], function (require) {
         });
 
         window.addEventListener('popstate', function () {
+            debugLog('popstate', {
+                pendingSuccessfulScanPayload: pendingSuccessfulScanPayload,
+                isScannerOpen: isScannerOpen,
+                scannerHistoryActive: scannerHistoryActive,
+                historyState: window.history && window.history.state ? window.history.state : null
+            });
+
             if (pendingSuccessfulScanPayload) {
                 continuePendingSuccessfulScan();
                 return;
