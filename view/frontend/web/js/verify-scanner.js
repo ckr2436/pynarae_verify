@@ -60,6 +60,7 @@ define(['require'], function (require) {
         var isFinishingScan = false;
         var isScannerOpen = false;
         var scannerHistoryActive = false;
+        var scannerHistoryStateToken = 'pynarae-scanner-' + Date.now() + '-' + Math.random().toString(16).slice(2);
         var isDetectingFrame = false;
         var openSessionId = 0;
         var messages = config.messages || {};
@@ -969,7 +970,8 @@ define(['require'], function (require) {
             scannerHistoryActive = !!(
                 window.history &&
                 window.history.state &&
-                window.history.state.pynaraeScanner === true
+                window.history.state.pynaraeScanner === true &&
+                window.history.state.pynaraeScannerToken === scannerHistoryStateToken
             );
         };
 
@@ -2054,7 +2056,11 @@ define(['require'], function (require) {
                 document.body.classList.add('pynarae-verify--scanner-open');
                 syncScannerHistoryFlag();
                 if (!scannerHistoryActive) {
-                    window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+                    window.history.pushState(
+                        {pynaraeScanner: true, pynaraeScannerToken: scannerHistoryStateToken},
+                        document.title,
+                        window.location.href
+                    );
                     scannerHistoryActive = true;
                 }
                 setMessage(messages.scanning, false);
@@ -2136,7 +2142,11 @@ define(['require'], function (require) {
             document.body.classList.add('pynarae-verify--scanner-open');
             syncScannerHistoryFlag();
             if (!scannerHistoryActive) {
-                window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
+                window.history.pushState(
+                    {pynaraeScanner: true, pynaraeScannerToken: scannerHistoryStateToken},
+                    document.title,
+                    window.location.href
+                );
                 scannerHistoryActive = true;
             }
             setMessage(messages.scanning, false);
