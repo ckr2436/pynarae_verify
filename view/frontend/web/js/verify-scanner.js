@@ -222,9 +222,10 @@ define(['require'], function (require) {
         var IOS_QRBOX_MIN = 240;
         var IOS_QRBOX_MAX = 380;
         var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
-        var IOS_FALLBACK_START_DELAY_MS = 250;
-        var IOS_FALLBACK_INTERVAL_MS = 300;
-        var IOS_FALLBACK_HINT_DELAY_MS = 2200;
+        var IOS_FALLBACK_START_DELAY_MS = 3500;
+        var IOS_FALLBACK_INTERVAL_MS = 900;
+        var IOS_FALLBACK_HINT_DELAY_MS = 2500;
+        var IOS_FALLBACK_MAX_ATTEMPTS = 8;
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -2186,7 +2187,8 @@ define(['require'], function (require) {
                     iosFallbackScanActive &&
                     sessionId === openSessionId &&
                     isScannerOpen &&
-                    !isFinishingScan
+                    !isFinishingScan &&
+                    !currentScanDecodeSource
                 ) {
                     setMessage(
                         messages.iosFallbackHint || messages.keepFocus || '',
@@ -2200,19 +2202,36 @@ define(['require'], function (require) {
                     !iosFallbackScanActive ||
                     sessionId !== openSessionId ||
                     !isScannerOpen ||
-                    isFinishingScan
+                    isFinishingScan ||
+                    currentScanDecodeSource
                 ) {
+                    return;
+                }
+
+                if (html5ScannerState !== 'running') {
+                    iosFallbackScanTimer = window.setTimeout(run, IOS_FALLBACK_INTERVAL_MS);
                     return;
                 }
 
                 currentScanFallbackAttempts += 1;
 
-                if (currentScanFallbackAttempts <= 5 || currentScanFallbackAttempts % 10 === 0) {
+                if (currentScanFallbackAttempts <= 5 || currentScanFallbackAttempts % 5 === 0) {
                     debugLog('iosScan:fallbackAttempt', {
                         sessionId: currentScanDebugSessionId,
                         elapsedMs: getCurrentScanElapsedMs(),
                         attempt: currentScanFallbackAttempts
                     });
+                }
+
+                if (currentScanFallbackAttempts > IOS_FALLBACK_MAX_ATTEMPTS) {
+                    debugLog('iosScan:fallbackStop:maxAttemptsReached', {
+                        sessionId: currentScanDebugSessionId,
+                        elapsedMs: getCurrentScanElapsedMs(),
+                        attempt: currentScanFallbackAttempts
+                    });
+
+                    iosFallbackScanActive = false;
+                    return;
                 }
 
                 try {
@@ -2236,7 +2255,12 @@ define(['require'], function (require) {
                         return;
                     }
                 } catch (e) {
-                    // Ignore per-frame decode errors and keep polling.
+                    debugLog('iosScan:fallbackDecodeError', {
+                        sessionId: currentScanDebugSessionId,
+                        elapsedMs: getCurrentScanElapsedMs(),
+                        attempt: currentScanFallbackAttempts,
+                        message: e && e.message ? e.message : String(e)
+                    });
                 }
 
                 iosFallbackScanTimer = window.setTimeout(run, IOS_FALLBACK_INTERVAL_MS);
@@ -2249,16 +2273,28 @@ define(['require'], function (require) {
             var label = String((camera && camera.label) || '').toLowerCase();
             var score = 0;
 
+            if (/^back camera$/.test(label)) {
+                score += 220;
+            }
+
             if (/back|rear|environment/.test(label)) {
                 score += 100;
             }
 
-            if (/wide|main|1x/.test(label)) {
-                score += 30;
+            if (/main|1x/.test(label)) {
+                score += 80;
+            }
+
+            if (/dual/.test(label)) {
+                score -= 30;
+            }
+
+            if (/wide/.test(label) && !/^back camera$/.test(label) && !/main|1x/.test(label)) {
+                score -= 20;
             }
 
             if (/ultra|macro|tele|zoom|front|selfie|continuity/.test(label)) {
-                score -= 60;
+                score -= 100;
             }
 
             return score;
