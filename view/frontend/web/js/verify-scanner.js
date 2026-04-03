@@ -708,11 +708,11 @@ define(['require'], function (require) {
             iosOverlayTitle.style.fontWeight = '600';
             iosOverlayTitle.style.letterSpacing = '0.02em';
             iosOverlayTitle.style.zIndex = '4';
-            iosOverlayTitle.textContent = 'Align the QR code within the frame';
+            iosOverlayTitle.textContent = messages.iosOverlayTitle || '';
 
             iosOverlayStopButton = document.createElement('button');
             iosOverlayStopButton.type = 'button';
-            iosOverlayStopButton.textContent = 'Stop Camera';
+            iosOverlayStopButton.textContent = messages.iosStopButton || '';
             iosOverlayStopButton.style.position = 'absolute';
             iosOverlayStopButton.style.left = '50%';
             iosOverlayStopButton.style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + 28px)';
