@@ -44,7 +44,6 @@ define(['require'], function (require) {
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
         var performUrl = (scannerRoot.getAttribute('data-perform-url') || '').trim();
         var secondaryTokenParamName = (scannerRoot.getAttribute('data-secondary-token-param') || '_svt').trim() || '_svt';
-        var formKey = (scannerRoot.getAttribute('data-form-key') || '').trim();
 
         var showProductSku = (scannerRoot.getAttribute('data-show-product-sku') || '') === '1';
         var showBatchNo = (scannerRoot.getAttribute('data-show-batch-no') || '') === '1';
@@ -985,9 +984,7 @@ define(['require'], function (require) {
             }
 
             try {
-                var response = await postJson(challengeCreateUrl, {
-                    form_key: formKey
-                });
+                var response = await postJson(challengeCreateUrl, {});
 
                 if (
                     !response.data ||
@@ -1027,7 +1024,6 @@ define(['require'], function (require) {
 
             try {
                 var response = await postJson(challengeVerifyUrl, {
-                    form_key: formKey,
                     challenge_id: challengeId,
                     challenge_code: challengeCode,
                     verification_code: scannedCode
@@ -1066,7 +1062,6 @@ define(['require'], function (require) {
 
             try {
                 var response = await postJson(performUrl, {
-                    form_key: formKey,
                     code: code,
                     _svt: verificationToken
                 });
