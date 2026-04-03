@@ -60,6 +60,7 @@ define(['require'], function (require) {
         var isFinishingScan = false;
         var isScannerOpen = false;
         var scannerHistoryActive = false;
+        var scannerHistoryStateToken = 'pynarae-scanner-' + Date.now() + '-' + Math.random().toString(16).slice(2);
         var isDetectingFrame = false;
         var openSessionId = 0;
         var messages = config.messages || {};
@@ -965,6 +966,15 @@ define(['require'], function (require) {
             }
         };
 
+        var syncScannerHistoryFlag = function () {
+            scannerHistoryActive = !!(
+                window.history &&
+                window.history.state &&
+                window.history.state.pynaraeScanner === true &&
+                window.history.state.pynaraeScannerToken === scannerHistoryStateToken
+            );
+        };
+
         var requestServerChallenge = async function () {
             if (!challengeCreateUrl) {
                 return {
@@ -1861,8 +1871,7 @@ define(['require'], function (require) {
                             return;
                         }
 
-                        scannerHistoryActive = false;
-                        closeScanner({syncHistory: false, invalidateSession: true});
+                        closeScanner({syncHistory: true, invalidateSession: true});
                         submitScannedCode(qrValue, allowedHosts);
                     }, 650);
 
@@ -1982,8 +1991,7 @@ define(['require'], function (require) {
                         return;
                     }
 
-                    scannerHistoryActive = false;
-                    closeScanner({syncHistory: false, invalidateSession: true});
+                    closeScanner({syncHistory: true, invalidateSession: true});
                     submitScannedCode(qrValue, allowedHosts);
                 }, 650);
             };
@@ -2046,8 +2054,15 @@ define(['require'], function (require) {
                 scanVideo.hidden = true;
                 isScannerOpen = true;
                 document.body.classList.add('pynarae-verify--scanner-open');
-                window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
-                scannerHistoryActive = true;
+                syncScannerHistoryFlag();
+                if (!scannerHistoryActive) {
+                    window.history.pushState(
+                        {pynaraeScanner: true, pynaraeScannerToken: scannerHistoryStateToken},
+                        document.title,
+                        window.location.href
+                    );
+                    scannerHistoryActive = true;
+                }
                 setMessage(messages.scanning, false);
 
                 try {
@@ -2125,8 +2140,15 @@ define(['require'], function (require) {
             bindScanModalPinchZoomListeners();
             isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
-            window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
-            scannerHistoryActive = true;
+            syncScannerHistoryFlag();
+            if (!scannerHistoryActive) {
+                window.history.pushState(
+                    {pynaraeScanner: true, pynaraeScannerToken: scannerHistoryStateToken},
+                    document.title,
+                    window.location.href
+                );
+                scannerHistoryActive = true;
+            }
             setMessage(messages.scanning, false);
 
             try {
