@@ -94,6 +94,13 @@ define(['require'], function (require) {
         };
 
         var runtimeFallbackFailureLimit = 2;
+        var IOS_QRBOX_RATIO = 0.72;
+        var IOS_QRBOX_MIN = 240;
+        var IOS_QRBOX_MAX = 380;
+        var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
+        var IOS_FALLBACK_START_DELAY_MS = 250;
+        var IOS_FALLBACK_INTERVAL_MS = 300;
+        var IOS_FALLBACK_HINT_DELAY_MS = 2200;
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -677,10 +684,12 @@ define(['require'], function (require) {
             iosOverlayGuide.style.position = 'absolute';
             iosOverlayGuide.style.left = '50%';
             iosOverlayGuide.style.top = '50%';
-            iosOverlayGuide.style.width = '72vw';
-            iosOverlayGuide.style.height = '72vw';
-            iosOverlayGuide.style.maxWidth = '320px';
-            iosOverlayGuide.style.maxHeight = '320px';
+            iosOverlayGuide.style.width = (IOS_QRBOX_RATIO * 100) + 'vw';
+            iosOverlayGuide.style.height = (IOS_QRBOX_RATIO * 100) + 'vw';
+            iosOverlayGuide.style.maxWidth = IOS_QRBOX_MAX + 'px';
+            iosOverlayGuide.style.maxHeight = IOS_QRBOX_MAX + 'px';
+            iosOverlayGuide.style.minWidth = IOS_QRBOX_MIN + 'px';
+            iosOverlayGuide.style.minHeight = IOS_QRBOX_MIN + 'px';
             iosOverlayGuide.style.transform = 'translate(-50%, -50%)';
             iosOverlayGuide.style.border = '6px solid rgba(255,255,255,0.92)';
             iosOverlayGuide.style.borderRadius = '28px';
@@ -1477,9 +1486,48 @@ define(['require'], function (require) {
                 return null;
             }
 
-            qrCanvas.width = width;
-            qrCanvas.height = height;
-            qrContext.drawImage(activeVideo, 0, 0, width, height);
+            var sourceX = 0;
+            var sourceY = 0;
+            var sourceWidth = width;
+            var sourceHeight = height;
+
+            if (isAppleMobileDevice) {
+                var cropEdge = Math.floor(Math.min(width, height) * IOS_QRBOX_RATIO);
+                cropEdge = Math.max(
+                    Math.min(IOS_QRBOX_MIN, Math.min(width, height)),
+                    Math.min(IOS_QRBOX_MAX, cropEdge)
+                );
+
+                sourceX = Math.floor((width - cropEdge) / 2);
+                sourceY = Math.floor((height - cropEdge) / 2);
+                sourceWidth = cropEdge;
+                sourceHeight = cropEdge;
+            }
+
+            var targetWidth = sourceWidth;
+            var targetHeight = sourceHeight;
+            var maxEdge = IOS_FALLBACK_FRAME_MAX_EDGE;
+
+            if (Math.max(targetWidth, targetHeight) > maxEdge) {
+                var scale = maxEdge / Math.max(targetWidth, targetHeight);
+                targetWidth = Math.max(1, Math.round(targetWidth * scale));
+                targetHeight = Math.max(1, Math.round(targetHeight * scale));
+            }
+
+            qrCanvas.width = targetWidth;
+            qrCanvas.height = targetHeight;
+            qrContext.clearRect(0, 0, targetWidth, targetHeight);
+            qrContext.drawImage(
+                activeVideo,
+                sourceX,
+                sourceY,
+                sourceWidth,
+                sourceHeight,
+                0,
+                0,
+                targetWidth,
+                targetHeight
+            );
 
             return qrCanvas;
         };
@@ -1977,11 +2025,11 @@ define(['require'], function (require) {
                     !isFinishingScan
                 ) {
                     setMessage(
-                        'Having trouble scanning? Move closer, keep the QR code inside the frame, and avoid glare.',
+                        messages.iosFallbackHint || messages.keepFocus || '',
                         false
                     );
                 }
-            }, 2500);
+            }, IOS_FALLBACK_HINT_DELAY_MS);
 
             var run = async function () {
                 if (
@@ -2008,10 +2056,10 @@ define(['require'], function (require) {
                     // Ignore per-frame decode errors and keep polling.
                 }
 
-                iosFallbackScanTimer = window.setTimeout(run, 180);
+                iosFallbackScanTimer = window.setTimeout(run, IOS_FALLBACK_INTERVAL_MS);
             };
 
-            iosFallbackScanTimer = window.setTimeout(run, 700);
+            iosFallbackScanTimer = window.setTimeout(run, IOS_FALLBACK_START_DELAY_MS);
         };
 
         var getIosCameraScore = function (camera) {
@@ -2093,8 +2141,8 @@ define(['require'], function (require) {
             if (isAppleMobileDevice) {
                 qrConfig.fps = 15;
                 qrConfig.qrbox = function (viewfinderWidth, viewfinderHeight) {
-                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.78);
-                    edge = Math.max(240, Math.min(420, edge));
+                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * IOS_QRBOX_RATIO);
+                    edge = Math.max(IOS_QRBOX_MIN, Math.min(IOS_QRBOX_MAX, edge));
 
                     return {
                         width: edge,
@@ -2121,6 +2169,9 @@ define(['require'], function (require) {
 
             ensureIosOverlay();
             showIosOverlay();
+            loadFallbackDetector().catch(function () {
+                // Ignore preload failures; fallback loop will retry if possible.
+            });
 
             html5Scanner = new window.Html5Qrcode(iosOverlayCameraRoot.id);
             html5ScannerState = 'starting';
