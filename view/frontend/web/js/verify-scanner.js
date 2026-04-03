@@ -218,15 +218,18 @@ define(['require'], function (require) {
         };
 
         var runtimeFallbackFailureLimit = 2;
-        var IOS_QRBOX_RATIO = 0.72;
-        var IOS_QRBOX_MIN = 240;
-        var IOS_QRBOX_MAX = 380;
-        var IOS_DECODE_PADDING_RATIO = 0.12;
+        var IOS_QRBOX_RATIO = 0.80;
+        var IOS_QRBOX_MIN = 260;
+        var IOS_QRBOX_MAX = 420;
+        /* 用户看到的白框，相比真实扫描区域向内缩多少 */
+        var IOS_GUIDE_INSET_RATIO = 0.12;
+        /* fallback 的真实解码区域比 html5 scan region 再外扩一点 */
+        var IOS_DECODE_PADDING_RATIO = 0.06;
         var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
-        var IOS_FALLBACK_START_DELAY_MS = 5000;
-        var IOS_FALLBACK_INTERVAL_MS = 1200;
-        var IOS_FALLBACK_HINT_DELAY_MS = 3000;
-        var IOS_FALLBACK_MAX_ATTEMPTS = 4;
+        var IOS_FALLBACK_START_DELAY_MS = 12000;
+        var IOS_FALLBACK_INTERVAL_MS = 1500;
+        var IOS_FALLBACK_HINT_DELAY_MS = 3500;
+        var IOS_FALLBACK_MAX_ATTEMPTS = 2;
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -888,7 +891,28 @@ define(['require'], function (require) {
             }, bounds);
         };
 
-        var getIosVisibleGuideRect = function () {
+        var insetRectByRatio = function (rect, ratio) {
+            if (!rect) {
+                return null;
+            }
+
+            var insetX = rect.width * ratio;
+            var insetY = rect.height * ratio;
+
+            var width = Math.max(1, rect.width - (insetX * 2));
+            var height = Math.max(1, rect.height - (insetY * 2));
+
+            return {
+                left: rect.left + insetX,
+                top: rect.top + insetY,
+                width: width,
+                height: height,
+                right: rect.left + insetX + width,
+                bottom: rect.top + insetY + height
+            };
+        };
+
+        var getIosActualScanRegionRect = function () {
             var scanRegion = getIosScanRegionElement();
             var scanRegionRect = getRectFromElement(scanRegion);
 
@@ -918,6 +942,15 @@ define(['require'], function (require) {
             };
         };
 
+        var getIosVisibleGuideRect = function () {
+            var actualRect = getIosActualScanRegionRect();
+            if (!actualRect) {
+                return null;
+            }
+
+            return insetRectByRatio(actualRect, IOS_GUIDE_INSET_RATIO);
+        };
+
         var syncIosGuideToActualScanRegion = function () {
             if (!iosOverlayGuide) {
                 return;
@@ -942,14 +975,14 @@ define(['require'], function (require) {
             }
 
             var videoContentRect = getDisplayedVideoContentRect(activeVideo);
-            var visibleGuideRect = getIosVisibleGuideRect();
+            var actualScanRegionRect = getIosActualScanRegionRect();
 
-            if (!videoContentRect || !visibleGuideRect) {
+            if (!videoContentRect || !actualScanRegionRect) {
                 return null;
             }
 
             return expandRectByRatio(
-                visibleGuideRect,
+                actualScanRegionRect,
                 IOS_DECODE_PADDING_RATIO,
                 videoContentRect
             );
@@ -2572,7 +2605,7 @@ define(['require'], function (require) {
             };
 
             if (isAppleMobileDevice) {
-                qrConfig.fps = 15;
+                qrConfig.fps = 10;
                 qrConfig.qrbox = function (viewfinderWidth, viewfinderHeight) {
                     var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * IOS_QRBOX_RATIO);
                     edge = Math.max(IOS_QRBOX_MIN, Math.min(IOS_QRBOX_MAX, edge));
