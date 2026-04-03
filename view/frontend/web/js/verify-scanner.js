@@ -965,6 +965,14 @@ define(['require'], function (require) {
             }
         };
 
+        var syncScannerHistoryFlag = function () {
+            scannerHistoryActive = !!(
+                window.history &&
+                window.history.state &&
+                window.history.state.pynaraeScanner === true
+            );
+        };
+
         var requestServerChallenge = async function () {
             if (!challengeCreateUrl) {
                 return {
@@ -2044,6 +2052,7 @@ define(['require'], function (require) {
                 scanVideo.hidden = true;
                 isScannerOpen = true;
                 document.body.classList.add('pynarae-verify--scanner-open');
+                syncScannerHistoryFlag();
                 if (!scannerHistoryActive) {
                     window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
                     scannerHistoryActive = true;
@@ -2125,6 +2134,7 @@ define(['require'], function (require) {
             bindScanModalPinchZoomListeners();
             isScannerOpen = true;
             document.body.classList.add('pynarae-verify--scanner-open');
+            syncScannerHistoryFlag();
             if (!scannerHistoryActive) {
                 window.history.pushState({pynaraeScanner: true}, document.title, window.location.href);
                 scannerHistoryActive = true;
