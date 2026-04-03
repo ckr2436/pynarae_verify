@@ -114,6 +114,9 @@ define(['require'], function (require) {
         var html5StartPromise = null;
         var html5ScannerState = 'idle';
         var html5PatchTimers = [];
+        var iosFallbackScanTimer = null;
+        var iosFallbackHintTimer = null;
+        var iosFallbackScanActive = false;
         var iosPinchActive = false;
         var iosPinchStartDistance = 0;
         var iosPinchStartZoom = 1;
@@ -376,6 +379,21 @@ define(['require'], function (require) {
             var dx = touchA.clientX - touchB.clientX;
             var dy = touchA.clientY - touchB.clientY;
             return Math.sqrt((dx * dx) + (dy * dy));
+        };
+
+        var getActiveScannerVideoElement = function () {
+            if (iosOverlayCameraRoot) {
+                var iosVideo = iosOverlayCameraRoot.querySelector('video');
+                if (iosVideo && iosVideo.readyState >= 2) {
+                    return iosVideo;
+                }
+            }
+
+            if (scanVideo && scanVideo.readyState >= 2) {
+                return scanVideo;
+            }
+
+            return null;
         };
 
         var getIosScannerVideoTrack = function () {
@@ -844,6 +862,7 @@ define(['require'], function (require) {
         };
 
         var stopHtml5Scanner = function () {
+            clearIosFallbackScan();
             clearHtml5PatchTimers();
             resetIosPinchState();
 
@@ -932,6 +951,8 @@ define(['require'], function (require) {
 
         var closeScanner = function (options) {
             var closeOptions = options || {};
+
+            clearIosFallbackScan();
 
             if (closeOptions.invalidateSession) {
                 invalidateOpenSession();
@@ -1444,16 +1465,21 @@ define(['require'], function (require) {
                 qrContext = qrCanvas.getContext('2d', {willReadFrequently: true});
             }
 
-            var width = scanVideo.videoWidth;
-            var height = scanVideo.videoHeight;
+            var activeVideo = getActiveScannerVideoElement();
+            if (!activeVideo || !qrContext) {
+                return null;
+            }
 
-            if (!width || !height || !qrContext) {
+            var width = activeVideo.videoWidth;
+            var height = activeVideo.videoHeight;
+
+            if (!width || !height) {
                 return null;
             }
 
             qrCanvas.width = width;
             qrCanvas.height = height;
-            qrContext.drawImage(scanVideo, 0, 0, width, height);
+            qrContext.drawImage(activeVideo, 0, 0, width, height);
 
             return qrCanvas;
         };
@@ -1852,6 +1878,41 @@ define(['require'], function (require) {
             }, typeof delay === 'number' ? delay : 220);
         };
 
+        var finalizeSuccessfulScan = function (qrValue, sessionId) {
+            if (sessionId !== openSessionId || isFinishingScan) {
+                return;
+            }
+
+            var normalizedValue = String(qrValue || '').trim();
+            if (!normalizedValue) {
+                return;
+            }
+
+            isFinishingScan = true;
+            clearTimers();
+            setIosGuideState('success');
+            setMessage(messages.successDetected, false);
+
+            successDelayTimer = window.setTimeout(function () {
+                if (sessionId !== openSessionId) {
+                    return;
+                }
+
+                var shouldSyncHistory = scannerHistoryActive === true;
+
+                pendingSuccessfulScanPayload = {
+                    qrValue: normalizedValue,
+                    allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
+                };
+
+                closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
+
+                if (!shouldSyncHistory) {
+                    continuePendingSuccessfulScan();
+                }
+            }, 650);
+        };
+
         var runScanLoop = async function (sessionId) {
             if (sessionId !== openSessionId || !isScannerOpen || !stream || isFinishingScan) {
                 return;
@@ -1872,29 +1933,7 @@ define(['require'], function (require) {
                 }
 
                 if (qrValue) {
-                    isFinishingScan = true;
-                    clearTimers();
-                    setMessage(messages.successDetected, false);
-
-                    successDelayTimer = window.setTimeout(function () {
-                        if (sessionId !== openSessionId) {
-                            return;
-                        }
-
-                        var shouldSyncHistory = scannerHistoryActive === true;
-
-                        pendingSuccessfulScanPayload = {
-                            qrValue: qrValue,
-                            allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
-                        };
-
-                        closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
-
-                        if (!shouldSyncHistory) {
-                            continuePendingSuccessfulScan();
-                        }
-                    }, 650);
-
+                    finalizeSuccessfulScan(qrValue, sessionId);
                     return;
                 }
             } catch (e) {
@@ -1912,20 +1951,98 @@ define(['require'], function (require) {
             scheduleNextScan(sessionId, 220);
         };
 
+        var clearIosFallbackScan = function () {
+            iosFallbackScanActive = false;
+
+            if (iosFallbackScanTimer) {
+                window.clearTimeout(iosFallbackScanTimer);
+                iosFallbackScanTimer = null;
+            }
+
+            if (iosFallbackHintTimer) {
+                window.clearTimeout(iosFallbackHintTimer);
+                iosFallbackHintTimer = null;
+            }
+        };
+
+        var startIosFallbackFrameDecodeLoop = function (sessionId) {
+            clearIosFallbackScan();
+            iosFallbackScanActive = true;
+
+            iosFallbackHintTimer = window.setTimeout(function () {
+                if (
+                    iosFallbackScanActive &&
+                    sessionId === openSessionId &&
+                    isScannerOpen &&
+                    !isFinishingScan
+                ) {
+                    setMessage(
+                        'Having trouble scanning? Move closer, keep the QR code inside the frame, and avoid glare.',
+                        false
+                    );
+                }
+            }, 2500);
+
+            var run = async function () {
+                if (
+                    !iosFallbackScanActive ||
+                    sessionId !== openSessionId ||
+                    !isScannerOpen ||
+                    isFinishingScan
+                ) {
+                    return;
+                }
+
+                try {
+                    var qrValue = (await detectQrCode() || '').trim();
+
+                    if (
+                        iosFallbackScanActive &&
+                        sessionId === openSessionId &&
+                        qrValue
+                    ) {
+                        finalizeSuccessfulScan(qrValue, sessionId);
+                        return;
+                    }
+                } catch (e) {
+                    // Ignore per-frame decode errors and keep polling.
+                }
+
+                iosFallbackScanTimer = window.setTimeout(run, 180);
+            };
+
+            iosFallbackScanTimer = window.setTimeout(run, 700);
+        };
+
+        var getIosCameraScore = function (camera) {
+            var label = String((camera && camera.label) || '').toLowerCase();
+            var score = 0;
+
+            if (/back|rear|environment/.test(label)) {
+                score += 100;
+            }
+
+            if (/wide|main|1x/.test(label)) {
+                score += 30;
+            }
+
+            if (/ultra|macro|tele|zoom|front|selfie|continuity/.test(label)) {
+                score -= 60;
+            }
+
+            return score;
+        };
+
         var selectPreferredHtml5CameraId = function (cameras) {
             if (!cameras || !cameras.length) {
                 return null;
             }
 
-            var backCamera = cameras.find(function (camera) {
-                return /back|rear|environment/i.test(camera.label || '');
+            var sorted = cameras.slice().sort(function (a, b) {
+                return getIosCameraScore(b) - getIosCameraScore(a);
             });
 
-            if (backCamera) {
-                return backCamera.id;
-            }
-
-            return cameras[cameras.length - 1].id;
+            return sorted[0] ? sorted[0].id : null;
         };
 
         var getHtml5CameraSource = async function () {
@@ -1959,8 +2076,8 @@ define(['require'], function (require) {
             if (isAppleMobileDevice) {
                 qrConfig.fps = 15;
                 qrConfig.qrbox = function (viewfinderWidth, viewfinderHeight) {
-                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.62);
-                    edge = Math.max(200, Math.min(320, edge));
+                    var edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.78);
+                    edge = Math.max(240, Math.min(420, edge));
 
                     return {
                         width: edge,
@@ -2001,29 +2118,7 @@ define(['require'], function (require) {
                     return;
                 }
 
-                isFinishingScan = true;
-                clearTimers();
-                setIosGuideState('success');
-                setMessage(messages.successDetected, false);
-
-                successDelayTimer = window.setTimeout(function () {
-                    if (sessionId !== openSessionId) {
-                        return;
-                    }
-
-                    var shouldSyncHistory = scannerHistoryActive === true;
-
-                    pendingSuccessfulScanPayload = {
-                        qrValue: qrValue,
-                        allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
-                    };
-
-                    closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
-
-                    if (!shouldSyncHistory) {
-                        continuePendingSuccessfulScan();
-                    }
-                }, 650);
+                finalizeSuccessfulScan(qrValue, sessionId);
             };
 
             var onScanFailure = function () {
@@ -2047,6 +2142,7 @@ define(['require'], function (require) {
                 patchIosHtml5Preview();
                 scheduleIosHtml5Patches();
                 resetIosPinchState();
+                startIosFallbackFrameDecodeLoop(sessionId);
 
                 window.setTimeout(function () {
                     if (sessionId !== openSessionId || html5ScannerState !== 'running') {
