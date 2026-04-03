@@ -1118,8 +1118,8 @@ define(['require'], function (require) {
             iosOverlayStopButton.style.letterSpacing = '0.08em';
             iosOverlayStopButton.style.textTransform = 'uppercase';
 
-            iosOverlayStopButton.addEventListener('click', function () {
-                closeScanner({syncHistory: true, invalidateSession: true});
+            iosOverlayStopButton.addEventListener('click', async function () {
+                await closeScanner({syncHistory: true, invalidateSession: true});
                 setMessage(messages.scanFailedRetry, true);
             });
 
@@ -2458,11 +2458,11 @@ define(['require'], function (require) {
                     allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.slice() : allowedHosts
                 };
 
-                closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true});
-
-                if (!shouldSyncHistory) {
-                    continuePendingSuccessfulScan();
-                }
+                closeScanner({syncHistory: shouldSyncHistory, invalidateSession: true}).then(function () {
+                    if (!shouldSyncHistory) {
+                        continuePendingSuccessfulScan();
+                    }
+                });
             }, 650);
         };
 
@@ -2971,10 +2971,8 @@ define(['require'], function (require) {
         };
 
         scanTrigger.addEventListener('click', async function () {
-            closeScanner({syncHistory: false, invalidateSession: true});
+            await closeScanner({syncHistory: false, invalidateSession: true});
             resetFallbackSessionState();
-            await stopIosQrScanner();
-            await stopHtml5Scanner();
             beginScanDebugSession({
                 source: 'scanTrigger.click',
                 previousScannerHistoryActive: scannerHistoryActive
