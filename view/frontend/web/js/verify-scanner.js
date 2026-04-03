@@ -222,10 +222,10 @@ define(['require'], function (require) {
         var IOS_QRBOX_MIN = 240;
         var IOS_QRBOX_MAX = 380;
         var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
-        var IOS_FALLBACK_START_DELAY_MS = 3500;
-        var IOS_FALLBACK_INTERVAL_MS = 900;
-        var IOS_FALLBACK_HINT_DELAY_MS = 2500;
-        var IOS_FALLBACK_MAX_ATTEMPTS = 8;
+        var IOS_FALLBACK_START_DELAY_MS = 5000;
+        var IOS_FALLBACK_INTERVAL_MS = 1200;
+        var IOS_FALLBACK_HINT_DELAY_MS = 3000;
+        var IOS_FALLBACK_MAX_ATTEMPTS = 4;
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -2273,28 +2273,22 @@ define(['require'], function (require) {
             var label = String((camera && camera.label) || '').toLowerCase();
             var score = 0;
 
-            if (/^back camera$/.test(label)) {
-                score += 220;
-            }
-
             if (/back|rear|environment/.test(label)) {
                 score += 100;
             }
 
-            if (/main|1x/.test(label)) {
+            if (/dual wide/.test(label)) {
+                score += 120;
+            } else if (/main|1x/.test(label)) {
                 score += 80;
-            }
-
-            if (/dual/.test(label)) {
-                score -= 30;
-            }
-
-            if (/wide/.test(label) && !/^back camera$/.test(label) && !/main|1x/.test(label)) {
-                score -= 20;
+            } else if (/^back camera$/.test(label)) {
+                score += 60;
+            } else if (/\bwide\b/.test(label)) {
+                score += 20;
             }
 
             if (/ultra|macro|tele|zoom|front|selfie|continuity/.test(label)) {
-                score -= 100;
+                score -= 120;
             }
 
             return score;
@@ -2415,11 +2409,21 @@ define(['require'], function (require) {
 
             ensureIosOverlay();
             showIosOverlay();
-            loadFallbackDetector().catch(function () {
-                // Ignore preload failures; fallback loop will retry if possible.
-            });
+            var html5ScannerConfig = {};
 
-            html5Scanner = new window.Html5Qrcode(iosOverlayCameraRoot.id);
+            if (
+                window.Html5QrcodeSupportedFormats &&
+                typeof window.Html5QrcodeSupportedFormats.QR_CODE !== 'undefined'
+            ) {
+                html5ScannerConfig.formatsToSupport = [
+                    window.Html5QrcodeSupportedFormats.QR_CODE
+                ];
+            }
+
+            html5Scanner = new window.Html5Qrcode(
+                iosOverlayCameraRoot.id,
+                html5ScannerConfig
+            );
             html5ScannerState = 'starting';
 
             var onScanSuccess = function (decodedText) {
