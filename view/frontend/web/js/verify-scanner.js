@@ -221,6 +221,7 @@ define(['require'], function (require) {
         var IOS_QRBOX_RATIO = 0.72;
         var IOS_QRBOX_MIN = 240;
         var IOS_QRBOX_MAX = 380;
+        var IOS_DECODE_PADDING_RATIO = 0.12;
         var IOS_FALLBACK_FRAME_MAX_EDGE = 960;
         var IOS_FALLBACK_START_DELAY_MS = 5000;
         var IOS_FALLBACK_INTERVAL_MS = 1200;
@@ -784,6 +785,176 @@ define(['require'], function (require) {
             scanModalPinchListenersBound = true;
         };
 
+        var getRectFromElement = function (element) {
+            if (!element || typeof element.getBoundingClientRect !== 'function') {
+                return null;
+            }
+
+            var rect = element.getBoundingClientRect();
+            if (!rect || !rect.width || !rect.height) {
+                return null;
+            }
+
+            return {
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                right: rect.left + rect.width,
+                bottom: rect.top + rect.height
+            };
+        };
+
+        var getIosScanRegionElement = function () {
+            if (!iosOverlayCameraRoot) {
+                return null;
+            }
+
+            return document.getElementById(iosOverlayCameraRoot.id + '__scan_region') ||
+                iosOverlayCameraRoot.querySelector('[id$="__scan_region"]');
+        };
+
+        var getDisplayedVideoContentRect = function (video) {
+            var videoRect = getRectFromElement(video);
+            if (!videoRect || !video.videoWidth || !video.videoHeight) {
+                return videoRect;
+            }
+
+            var videoAspect = video.videoWidth / video.videoHeight;
+            var boxAspect = videoRect.width / videoRect.height;
+
+            var drawWidth;
+            var drawHeight;
+            var drawLeft;
+            var drawTop;
+
+            if (videoAspect > boxAspect) {
+                drawHeight = videoRect.height;
+                drawWidth = drawHeight * videoAspect;
+                drawLeft = videoRect.left - ((drawWidth - videoRect.width) / 2);
+                drawTop = videoRect.top;
+            } else {
+                drawWidth = videoRect.width;
+                drawHeight = drawWidth / videoAspect;
+                drawLeft = videoRect.left;
+                drawTop = videoRect.top - ((drawHeight - videoRect.height) / 2);
+            }
+
+            return {
+                left: drawLeft,
+                top: drawTop,
+                width: drawWidth,
+                height: drawHeight,
+                right: drawLeft + drawWidth,
+                bottom: drawTop + drawHeight
+            };
+        };
+
+        var clampRectToBounds = function (rect, bounds) {
+            if (!rect || !bounds) {
+                return rect;
+            }
+
+            var left = Math.max(bounds.left, rect.left);
+            var top = Math.max(bounds.top, rect.top);
+            var right = Math.min(bounds.right, rect.right);
+            var bottom = Math.min(bounds.bottom, rect.bottom);
+
+            return {
+                left: left,
+                top: top,
+                right: right,
+                bottom: bottom,
+                width: Math.max(1, right - left),
+                height: Math.max(1, bottom - top)
+            };
+        };
+
+        var expandRectByRatio = function (rect, ratio, bounds) {
+            if (!rect) {
+                return null;
+            }
+
+            var padX = rect.width * ratio;
+            var padY = rect.height * ratio;
+
+            return clampRectToBounds({
+                left: rect.left - padX,
+                top: rect.top - padY,
+                right: rect.right + padX,
+                bottom: rect.bottom + padY,
+                width: rect.width + (padX * 2),
+                height: rect.height + (padY * 2)
+            }, bounds);
+        };
+
+        var getIosVisibleGuideRect = function () {
+            var scanRegion = getIosScanRegionElement();
+            var scanRegionRect = getRectFromElement(scanRegion);
+
+            if (scanRegionRect) {
+                return scanRegionRect;
+            }
+
+            if (!iosOverlayCameraRoot) {
+                return null;
+            }
+
+            var rootRect = getRectFromElement(iosOverlayCameraRoot);
+            if (!rootRect) {
+                return null;
+            }
+
+            var edge = Math.floor(Math.min(rootRect.width, rootRect.height) * IOS_QRBOX_RATIO);
+            edge = Math.max(IOS_QRBOX_MIN, Math.min(IOS_QRBOX_MAX, edge));
+
+            return {
+                left: rootRect.left + ((rootRect.width - edge) / 2),
+                top: rootRect.top + ((rootRect.height - edge) / 2),
+                width: edge,
+                height: edge,
+                right: rootRect.left + ((rootRect.width - edge) / 2) + edge,
+                bottom: rootRect.top + ((rootRect.height - edge) / 2) + edge
+            };
+        };
+
+        var syncIosGuideToActualScanRegion = function () {
+            if (!iosOverlayGuide) {
+                return;
+            }
+
+            var guideRect = getIosVisibleGuideRect();
+            if (!guideRect) {
+                return;
+            }
+
+            iosOverlayGuide.style.left = guideRect.left + 'px';
+            iosOverlayGuide.style.top = guideRect.top + 'px';
+            iosOverlayGuide.style.width = guideRect.width + 'px';
+            iosOverlayGuide.style.height = guideRect.height + 'px';
+            iosOverlayGuide.style.transform = 'none';
+        };
+
+        var getIosEffectiveDecodeRect = function () {
+            var activeVideo = getActiveScannerVideoElement();
+            if (!activeVideo) {
+                return null;
+            }
+
+            var videoContentRect = getDisplayedVideoContentRect(activeVideo);
+            var visibleGuideRect = getIosVisibleGuideRect();
+
+            if (!videoContentRect || !visibleGuideRect) {
+                return null;
+            }
+
+            return expandRectByRatio(
+                visibleGuideRect,
+                IOS_DECODE_PADDING_RATIO,
+                videoContentRect
+            );
+        };
+
         var ensureIosOverlay = function () {
             if (iosOverlay) {
                 return iosOverlay;
@@ -818,15 +989,15 @@ define(['require'], function (require) {
 
             iosOverlayGuide = document.createElement('div');
             iosOverlayGuide.style.position = 'absolute';
-            iosOverlayGuide.style.left = '50%';
-            iosOverlayGuide.style.top = '50%';
-            iosOverlayGuide.style.width = (IOS_QRBOX_RATIO * 100) + 'vw';
-            iosOverlayGuide.style.height = (IOS_QRBOX_RATIO * 100) + 'vw';
+            iosOverlayGuide.style.left = '0';
+            iosOverlayGuide.style.top = '0';
+            iosOverlayGuide.style.width = IOS_QRBOX_MAX + 'px';
+            iosOverlayGuide.style.height = IOS_QRBOX_MAX + 'px';
             iosOverlayGuide.style.maxWidth = IOS_QRBOX_MAX + 'px';
             iosOverlayGuide.style.maxHeight = IOS_QRBOX_MAX + 'px';
             iosOverlayGuide.style.minWidth = IOS_QRBOX_MIN + 'px';
             iosOverlayGuide.style.minHeight = IOS_QRBOX_MIN + 'px';
-            iosOverlayGuide.style.transform = 'translate(-50%, -50%)';
+            iosOverlayGuide.style.transform = 'none';
             iosOverlayGuide.style.border = '6px solid rgba(255,255,255,0.92)';
             iosOverlayGuide.style.borderRadius = '28px';
             iosOverlayGuide.style.boxShadow = '0 0 0 200vmax rgba(0,0,0,0.18)';
@@ -909,6 +1080,8 @@ define(['require'], function (require) {
             scanRegion.style.border = '0';
             scanRegion.style.boxShadow = 'none';
             scanRegion.style.outline = '0';
+            scanRegion.style.borderRadius = '0';
+            scanRegion.style.opacity = '1';
 
             Array.prototype.forEach.call(scanRegion.querySelectorAll('*'), function (node) {
                 var tag = (node.tagName || '').toLowerCase();
@@ -927,6 +1100,12 @@ define(['require'], function (require) {
                 node.style.boxShadow = 'none';
                 node.style.outline = '0';
             });
+
+            var shadedRegion = document.getElementById(iosOverlayCameraRoot.id + '__dashboard_section');
+            if (shadedRegion) {
+                shadedRegion.style.display = 'none';
+                shadedRegion.style.opacity = '0';
+            }
         };
 
         var showIosOverlay = function () {
@@ -992,6 +1171,7 @@ define(['require'], function (require) {
             });
 
             stripIosHtml5QrcodeVisuals();
+            syncIosGuideToActualScanRegion();
         };
 
         var scheduleIosHtml5Patches = function () {
@@ -1642,16 +1822,29 @@ define(['require'], function (require) {
             var sourceHeight = height;
 
             if (isAppleMobileDevice) {
-                var cropEdge = Math.floor(Math.min(width, height) * IOS_QRBOX_RATIO);
-                cropEdge = Math.max(
-                    Math.min(IOS_QRBOX_MIN, Math.min(width, height)),
-                    Math.min(IOS_QRBOX_MAX, cropEdge)
-                );
+                var effectiveDecodeRect = getIosEffectiveDecodeRect();
+                var displayedVideoRect = getDisplayedVideoContentRect(activeVideo);
 
-                sourceX = Math.floor((width - cropEdge) / 2);
-                sourceY = Math.floor((height - cropEdge) / 2);
-                sourceWidth = cropEdge;
-                sourceHeight = cropEdge;
+                if (effectiveDecodeRect && displayedVideoRect) {
+                    var scaleX = width / displayedVideoRect.width;
+                    var scaleY = height / displayedVideoRect.height;
+
+                    sourceX = Math.max(0, Math.floor((effectiveDecodeRect.left - displayedVideoRect.left) * scaleX));
+                    sourceY = Math.max(0, Math.floor((effectiveDecodeRect.top - displayedVideoRect.top) * scaleY));
+                    sourceWidth = Math.min(width - sourceX, Math.round(effectiveDecodeRect.width * scaleX));
+                    sourceHeight = Math.min(height - sourceY, Math.round(effectiveDecodeRect.height * scaleY));
+                } else {
+                    var cropEdge = Math.floor(Math.min(width, height) * IOS_QRBOX_RATIO);
+                    cropEdge = Math.max(
+                        Math.min(IOS_QRBOX_MIN, Math.min(width, height)),
+                        Math.min(IOS_QRBOX_MAX, cropEdge)
+                    );
+
+                    sourceX = Math.floor((width - cropEdge) / 2);
+                    sourceY = Math.floor((height - cropEdge) / 2);
+                    sourceWidth = cropEdge;
+                    sourceHeight = cropEdge;
+                }
             }
 
             var targetWidth = sourceWidth;
@@ -2691,6 +2884,26 @@ define(['require'], function (require) {
 
         window.addEventListener('beforeunload', function () {
             closeScanner({syncHistory: false, invalidateSession: true});
+        });
+
+        window.addEventListener('resize', function () {
+            if (!isAppleMobileDevice || !isScannerOpen) {
+                return;
+            }
+
+            window.setTimeout(function () {
+                patchIosHtml5Preview();
+            }, 80);
+        });
+
+        window.addEventListener('orientationchange', function () {
+            if (!isAppleMobileDevice || !isScannerOpen) {
+                return;
+            }
+
+            window.setTimeout(function () {
+                patchIosHtml5Preview();
+            }, 180);
         });
     };
 });
