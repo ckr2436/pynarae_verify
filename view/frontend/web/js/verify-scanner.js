@@ -40,129 +40,9 @@ define(['require'], function (require) {
         ).trim();
         var activeVerificationCode = codeFromUrl || submittedCode;
         var verifyUrl = (scannerRoot.getAttribute('data-verify-url') || window.location.pathname).trim();
-        var debugEnabled = currentUrl.searchParams.get('verify_debug') === '1';
-        var debugPanel = null;
-        var debugPanelBody = null;
-        var debugMaxChars = 60000;
 
-        var debugSessionCounter = 0;
-        var currentScanDebugSessionId = null;
-        var currentScanDebugStartedAt = 0;
         var currentScanDecodeSource = null;
         var currentScanFallbackAttempts = 0;
-        var currentScanHtml5SuccessCount = 0;
-
-        var debugSerialize = function (payload) {
-            if (typeof payload === 'undefined') {
-                return '';
-            }
-
-            if (payload === null) {
-                return 'null';
-            }
-
-            if (typeof payload === 'string') {
-                return payload;
-            }
-
-            try {
-                return JSON.stringify(payload, null, 2);
-            } catch (e) {
-                try {
-                    return String(payload);
-                } catch (stringifyError) {
-                    return '[unserializable payload]';
-                }
-            }
-        };
-
-        var ensureDebugPanel = function () {
-            if (!debugEnabled || debugPanel) {
-                return;
-            }
-
-            debugPanel = document.createElement('details');
-            debugPanel.open = true;
-            debugPanel.style.marginTop = '16px';
-            debugPanel.style.padding = '12px';
-            debugPanel.style.border = '1px solid #d9d9d9';
-            debugPanel.style.borderRadius = '12px';
-            debugPanel.style.background = '#fff';
-            debugPanel.style.boxShadow = '0 4px 12px rgba(0,0,0,.05)';
-
-            var summary = document.createElement('summary');
-            summary.textContent = 'Verify Debug Panel';
-            summary.style.cursor = 'pointer';
-            summary.style.fontWeight = '700';
-            summary.style.marginBottom = '10px';
-
-            debugPanelBody = document.createElement('pre');
-            debugPanelBody.style.margin = '10px 0 0';
-            debugPanelBody.style.whiteSpace = 'pre-wrap';
-            debugPanelBody.style.wordBreak = 'break-word';
-            debugPanelBody.style.fontSize = '12px';
-            debugPanelBody.style.lineHeight = '1.45';
-            debugPanelBody.style.maxHeight = '45vh';
-            debugPanelBody.style.overflow = 'auto';
-            debugPanelBody.style.background = '#0f172a';
-            debugPanelBody.style.color = '#e2e8f0';
-            debugPanelBody.style.padding = '12px';
-            debugPanelBody.style.borderRadius = '10px';
-
-            debugPanel.appendChild(summary);
-            debugPanel.appendChild(debugPanelBody);
-            scannerRoot.appendChild(debugPanel);
-        };
-
-        var debugLog = function (label, payload) {
-            if (!debugEnabled) {
-                return;
-            }
-
-            ensureDebugPanel();
-
-            var now = new Date();
-            var message = '[' + now.toISOString() + '] ' + label;
-            var serialized = debugSerialize(payload);
-
-            if (serialized) {
-                message += '\n' + serialized;
-            }
-
-            if (debugPanelBody) {
-                debugPanelBody.textContent += (debugPanelBody.textContent ? '\n\n' : '') + message;
-
-                if (debugPanelBody.textContent.length > debugMaxChars) {
-                    debugPanelBody.textContent = debugPanelBody.textContent.slice(-debugMaxChars);
-                }
-
-                debugPanelBody.scrollTop = debugPanelBody.scrollHeight;
-            }
-        };
-
-        var beginScanDebugSession = function (context) {
-            debugSessionCounter += 1;
-            currentScanDebugSessionId = 'scan-' + debugSessionCounter;
-            currentScanDebugStartedAt = Date.now();
-            currentScanDecodeSource = null;
-            currentScanFallbackAttempts = 0;
-            currentScanHtml5SuccessCount = 0;
-
-            debugLog('scanSession:begin', {
-                sessionId: currentScanDebugSessionId,
-                context: context || null,
-                href: window.location.href,
-                userAgent: navigator.userAgent
-            });
-        };
-
-        var getCurrentScanElapsedMs = function () {
-            if (!currentScanDebugStartedAt) {
-                return null;
-            }
-
-            return Date.now() - currentScanDebugStartedAt;
-        };
 
         var challengeCreateUrl = (scannerRoot.getAttribute('data-challenge-create-url') || '').trim();
         var challengeVerifyUrl = (scannerRoot.getAttribute('data-challenge-verify-url') || '').trim();
@@ -234,17 +114,6 @@ define(['require'], function (require) {
 
         var isAppleMobileDevice = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-        if (debugEnabled) {
-            ensureDebugPanel();
-            debugLog('init', {
-                href: window.location.href,
-                codeFromUrl: codeFromUrl,
-                submittedCode: submittedCode,
-                activeVerificationCode: activeVerificationCode,
-                isAppleMobileDevice: isAppleMobileDevice
-            });
-        }
 
         var assetUrls = {
             qrScannerModule: require.toUrl('Pynarae_Verify/lib/qr-scanner/qr-scanner.umd.min.js'),
@@ -1277,10 +1146,6 @@ define(['require'], function (require) {
                 return Promise.resolve();
             }
 
-            debugLog('iosScan:stopQrScanner', {
-                sessionId: currentScanDebugSessionId,
-                hasScanner: !!iosQrScannerInstance
-            });
 
             var scanner = iosQrScannerInstance;
             iosQrScannerInstance = null;
@@ -1304,11 +1169,6 @@ define(['require'], function (require) {
         };
 
         var stopHtml5Scanner = function () {
-            debugLog('iosScan:stopHtml5Scanner', {
-                sessionId: currentScanDebugSessionId,
-                html5ScannerState: html5ScannerState,
-                hasScanner: !!html5Scanner
-            });
 
             clearIosFallbackScan();
             clearHtml5PatchTimers();
@@ -1412,14 +1272,6 @@ define(['require'], function (require) {
             closeScannerQueue = closeScannerQueue.catch(function () {
                 // Ignore prior close errors and continue queue.
             }).then(async function () {
-                debugLog('scan:closeScanner', {
-                    sessionId: currentScanDebugSessionId,
-                    options: closeOptions,
-                    scannerHistoryActive: scannerHistoryActive,
-                    isScannerOpen: isScannerOpen,
-                    decodeSource: currentScanDecodeSource,
-                    fallbackAttempts: currentScanFallbackAttempts
-                });
 
                 clearIosFallbackScan();
 
@@ -2424,13 +2276,6 @@ define(['require'], function (require) {
         };
 
         var finalizeSuccessfulScan = function (qrValue, sessionId) {
-            debugLog('scan:finalizeSuccessfulScan', {
-                sessionId: currentScanDebugSessionId,
-                elapsedMs: getCurrentScanElapsedMs(),
-                decodeSource: currentScanDecodeSource,
-                fallbackAttempts: currentScanFallbackAttempts,
-                qrValue: qrValue
-            });
 
             if (sessionId !== openSessionId || isFinishingScan) {
                 return;
@@ -2505,12 +2350,6 @@ define(['require'], function (require) {
         };
 
         var clearIosFallbackScan = function () {
-            debugLog('iosScan:clearFallbackLoop', {
-                sessionId: currentScanDebugSessionId,
-                hadTimer: !!iosFallbackScanTimer,
-                hadHintTimer: !!iosFallbackHintTimer,
-                wasActive: iosFallbackScanActive
-            });
 
             iosFallbackScanActive = false;
 
@@ -2562,20 +2401,7 @@ define(['require'], function (require) {
 
                 currentScanFallbackAttempts += 1;
 
-                if (currentScanFallbackAttempts <= 5 || currentScanFallbackAttempts % 5 === 0) {
-                    debugLog('iosScan:fallbackAttempt', {
-                        sessionId: currentScanDebugSessionId,
-                        elapsedMs: getCurrentScanElapsedMs(),
-                        attempt: currentScanFallbackAttempts
-                    });
-                }
-
                 if (currentScanFallbackAttempts > IOS_FALLBACK_MAX_ATTEMPTS) {
-                    debugLog('iosScan:fallbackStop:maxAttemptsReached', {
-                        sessionId: currentScanDebugSessionId,
-                        elapsedMs: getCurrentScanElapsedMs(),
-                        attempt: currentScanFallbackAttempts
-                    });
 
                     iosFallbackScanActive = false;
                     return;
@@ -2591,23 +2417,11 @@ define(['require'], function (require) {
                     ) {
                         currentScanDecodeSource = 'fallback-frame-decode';
 
-                        debugLog('iosScan:fallbackDecodeSuccess', {
-                            sessionId: currentScanDebugSessionId,
-                            elapsedMs: getCurrentScanElapsedMs(),
-                            attempt: currentScanFallbackAttempts,
-                            qrValue: qrValue
-                        });
 
                         finalizeSuccessfulScan(qrValue, sessionId);
                         return;
                     }
                 } catch (e) {
-                    debugLog('iosScan:fallbackDecodeError', {
-                        sessionId: currentScanDebugSessionId,
-                        elapsedMs: getCurrentScanElapsedMs(),
-                        attempt: currentScanFallbackAttempts,
-                        message: e && e.message ? e.message : String(e)
-                    });
                 }
 
                 iosFallbackScanTimer = window.setTimeout(run, IOS_FALLBACK_INTERVAL_MS);
@@ -2643,9 +2457,6 @@ define(['require'], function (require) {
 
         var selectPreferredHtml5CameraId = function (cameras) {
             if (!cameras || !cameras.length) {
-                debugLog('iosCamera:select:none', {
-                    sessionId: currentScanDebugSessionId
-                });
                 return null;
             }
 
@@ -2661,18 +2472,10 @@ define(['require'], function (require) {
                 return Math.max(best, camera.score);
             }, -Infinity);
 
-            debugLog('iosCamera:available', {
-                sessionId: currentScanDebugSessionId,
-                cameras: scoredCameras,
-                topScore: topScore
-            });
 
             // When labels are missing/ambiguous, camera scores are often 0.
             // Returning null preserves the facingMode:"environment" fallback.
             if (!isFinite(topScore) || topScore <= 0) {
-                debugLog('iosCamera:fallbackToFacingModeEnvironment', {
-                    sessionId: currentScanDebugSessionId
-                });
                 return null;
             }
 
@@ -2680,10 +2483,6 @@ define(['require'], function (require) {
                 return b.score - a.score;
             });
 
-            debugLog('iosCamera:selectedByScore', {
-                sessionId: currentScanDebugSessionId,
-                selected: scoredCameras[0] || null
-            });
 
             return scoredCameras[0] ? scoredCameras[0].id : null;
         };
@@ -2697,10 +2496,6 @@ define(['require'], function (require) {
                     var preferredCameraId = selectPreferredHtml5CameraId(cameras);
 
                     if (preferredCameraId) {
-                        debugLog('iosCamera:source', {
-                            sessionId: currentScanDebugSessionId,
-                            source: preferredCameraId
-                        });
                         return preferredCameraId;
                     }
                 } catch (e) {
@@ -2708,10 +2503,6 @@ define(['require'], function (require) {
                 }
             }
 
-            debugLog('iosCamera:source', {
-                sessionId: currentScanDebugSessionId,
-                source: {facingMode: 'environment'}
-            });
 
             return {
                 facingMode: 'environment'
@@ -2782,11 +2573,6 @@ define(['require'], function (require) {
 
             iosOverlayCameraRoot.appendChild(iosQrScannerVideo);
 
-            var scannerStartAt = Date.now();
-            debugLog('iosScan:qrScannerStart:begin', {
-                sessionId: currentScanDebugSessionId
-            });
-
             var QrScannerResolved = qrScannerCtor;
 
             if (!QrScannerResolved || typeof QrScannerResolved !== 'function') {
@@ -2814,11 +2600,6 @@ define(['require'], function (require) {
 
                     currentScanDecodeSource = 'ios-qr-scanner';
 
-                    debugLog('iosScan:qrScannerDecodeSuccess', {
-                        sessionId: currentScanDebugSessionId,
-                        elapsedMs: getCurrentScanElapsedMs(),
-                        qrValue: qrValue
-                    });
 
                     finalizeSuccessfulScan(qrValue, sessionId);
                 },
@@ -2842,10 +2623,6 @@ define(['require'], function (require) {
 
             await iosQrScannerInstance.start();
 
-            debugLog('iosScan:qrScannerStart:success', {
-                sessionId: currentScanDebugSessionId,
-                elapsedMs: Date.now() - scannerStartAt
-            });
 
             patchIosHtml5Preview();
             scheduleIosHtml5Patches();
@@ -2902,15 +2679,8 @@ define(['require'], function (require) {
                     return;
                 }
 
-                currentScanHtml5SuccessCount += 1;
                 currentScanDecodeSource = 'html5-qrcode';
 
-                debugLog('iosScan:html5DecodeSuccess', {
-                    sessionId: currentScanDebugSessionId,
-                    elapsedMs: getCurrentScanElapsedMs(),
-                    qrValue: qrValue,
-                    html5SuccessCount: currentScanHtml5SuccessCount
-                });
 
                 finalizeSuccessfulScan(qrValue, sessionId);
             };
@@ -2925,21 +2695,12 @@ define(['require'], function (require) {
                 return;
             }
 
-            var iosScannerStartAt = Date.now();
-            debugLog('iosScan:html5Start:begin', {
-                sessionId: currentScanDebugSessionId
-            });
-
             html5StartPromise = html5Scanner.start(
                 cameraSource,
                 getHtml5QrcodeConfig(),
                 onScanSuccess,
                 onScanFailure
             ).then(function () {
-                debugLog('iosScan:html5Start:success', {
-                    sessionId: currentScanDebugSessionId,
-                    elapsedMs: Date.now() - iosScannerStartAt
-                });
                 html5ScannerState = 'running';
                 setIosGuideState('idle');
                 patchIosHtml5Preview();
@@ -2955,11 +2716,6 @@ define(['require'], function (require) {
                     applyIosTrackZoomFactor(1);
                 }, 180);
             }).catch(function (startError) {
-                debugLog('iosScan:html5Start:error', {
-                    sessionId: currentScanDebugSessionId,
-                    elapsedMs: Date.now() - iosScannerStartAt,
-                    message: startError && startError.message ? startError.message : String(startError)
-                });
                 html5ScannerState = 'idle';
                 html5Scanner = null;
                 html5StartPromise = null;
@@ -2973,10 +2729,6 @@ define(['require'], function (require) {
         scanTrigger.addEventListener('click', async function () {
             await closeScanner({syncHistory: false, invalidateSession: true});
             resetFallbackSessionState();
-            beginScanDebugSession({
-                source: 'scanTrigger.click',
-                previousScannerHistoryActive: scannerHistoryActive
-            });
 
             var sessionId = openSessionId;
             var sessionStream = null;
@@ -2987,9 +2739,6 @@ define(['require'], function (require) {
             }
 
             if (isAppleMobileDevice) {
-                debugLog('iosScan:openRequested', {
-                    sessionId: currentScanDebugSessionId
-                });
                 scanModal.hidden = true;
                 scanVideo.hidden = true;
                 isScannerOpen = true;
@@ -3008,12 +2757,6 @@ define(['require'], function (require) {
                 try {
                     await startIosQrScanner(sessionId);
                 } catch (iosPrimaryStartError) {
-                    debugLog('iosScan:qrScannerPrimaryFailed', {
-                        sessionId: currentScanDebugSessionId,
-                        message: iosPrimaryStartError && iosPrimaryStartError.message
-                            ? iosPrimaryStartError.message
-                            : String(iosPrimaryStartError)
-                    });
 
                     try {
                         await stopIosQrScanner();
