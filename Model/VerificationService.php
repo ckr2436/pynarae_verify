@@ -151,7 +151,7 @@ class VerificationService
             'scan_count' => $newScanCount,
             'product_sku' => (string)($row['product_sku'] ?? ($decodedPayload['sku'] ?? '')),
             'batch_no' => (string)($row['batch_no'] ?? ($decodedPayload['batch'] ?? '')),
-            'product_name' => (string)($decodedPayload['product_name'] ?? ''),
+            'product_name' => (string)($row['product_name'] ?? ($decodedPayload['product_name'] ?? '')),
             'first_scanned_at' => $isFirstScan ? $now : (string)($row['first_scanned_at'] ?? ''),
             'last_scanned_at' => $now,
         ];

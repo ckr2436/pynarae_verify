@@ -282,9 +282,13 @@ define(['require'], function (require) {
             resultText.textContent = String(result.message || '');
             resultPanel.hidden = false;
 
-            appendDetailRow('Verification Code', result.code || '');
+            var productDisplayName = String(result.product_name || '').trim();
+            if (!productDisplayName) {
+                productDisplayName = String(result.product_sku || '').trim();
+            }
+
+            appendDetailRow('Product', productDisplayName);
             appendDetailRow('Authenticity Status', result.matched ? 'Verified' : 'Unable to Verify');
-            appendDetailRow('Product Name', result.product_name || '');
 
             if (showProductSku) {
                 appendDetailRow('Product SKU', result.product_sku || '');
