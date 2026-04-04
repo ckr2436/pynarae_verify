@@ -62,10 +62,27 @@ class Save extends AbstractCode
                 }
             }
 
+            $productName = trim((string)($data['product_name'] ?? ''));
+            $productSku = trim((string)($data['product_sku'] ?? ''));
+            $batchNo = trim((string)($data['batch_no'] ?? ''));
+
+            if ($productName === '') {
+                throw new LocalizedException(__('Product Name is required.'));
+            }
+
+            if ($productSku === '') {
+                throw new LocalizedException(__('Product SKU is required.'));
+            }
+
+            if ($batchNo === '') {
+                throw new LocalizedException(__('Batch Number is required.'));
+            }
+
             $model->setData('code', $code);
             $model->setData('status', ((int)($data['status'] ?? 1)) === 0 ? 0 : 1);
-            $model->setData('product_sku', trim((string)($data['product_sku'] ?? '')) ?: null);
-            $model->setData('batch_no', trim((string)($data['batch_no'] ?? '')) ?: null);
+            $model->setData('product_name', $productName);
+            $model->setData('product_sku', $productSku);
+            $model->setData('batch_no', $batchNo);
             $model->setData('notes', trim((string)($data['notes'] ?? '')) ?: null);
             $model->setData('meta_json', $metaJson !== '' ? $metaJson : null);
 

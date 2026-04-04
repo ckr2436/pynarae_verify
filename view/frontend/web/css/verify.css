@@ -210,3 +210,31 @@ body.pynarae-verify--scanner-open {
 .pynarae-verify__details .table th {
     width: 280px;
 }
+
+@media (max-width: 768px) {
+    .pynarae-verify__details .table,
+    .pynarae-verify__details .table tbody,
+    .pynarae-verify__details .table tr,
+    .pynarae-verify__details .table th,
+    .pynarae-verify__details .table td {
+        display: block;
+        width: 100%;
+    }
+
+    .pynarae-verify__details .table tr {
+        padding: 10px 0;
+        border-bottom: 1px solid #ececec;
+    }
+
+    .pynarae-verify__details .table tr:last-child {
+        border-bottom: 0;
+    }
+
+    .pynarae-verify__details .table th {
+        margin-bottom: 4px;
+    }
+
+    .pynarae-verify__details .table td {
+        word-break: break-word;
+    }
+}

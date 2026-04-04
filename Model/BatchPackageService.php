@@ -43,6 +43,18 @@ class BatchPackageService
         $sku = trim((string)($params['product_sku'] ?? ''));
         $batchNo = trim((string)($params['batch_no'] ?? ''));
         $productName = trim((string)($params['product_name'] ?? ''));
+        if ($productName === '') {
+            throw new LocalizedException(new Phrase('Product Name is required.'));
+        }
+
+        if ($sku === '') {
+            throw new LocalizedException(new Phrase('Product SKU is required.'));
+        }
+
+        if ($batchNo === '') {
+            throw new LocalizedException(new Phrase('Batch Number is required.'));
+        }
+
         $notes = trim((string)($params['notes'] ?? ''));
         $status = ((int)($params['status'] ?? 1)) === 0 ? 0 : 1;
         $insert = ((int)($params['insert_db'] ?? 1)) === 1;
@@ -170,6 +182,7 @@ class BatchPackageService
             if ($insert) {
                 $insertRows[] = [
                     'code' => $code,
+                    'product_name' => $productName !== '' ? $productName : null,
                     'product_sku' => $sku !== '' ? $sku : null,
                     'batch_no' => $batchNo !== '' ? $batchNo : null,
                     'status' => $status,
@@ -186,7 +199,7 @@ class BatchPackageService
                 $connection->insertOnDuplicate(
                     $table,
                     $row,
-                    ['product_sku', 'batch_no', 'status', 'notes', 'meta_json']
+                    ['product_name', 'product_sku', 'batch_no', 'status', 'notes', 'meta_json']
                 );
             }
         }

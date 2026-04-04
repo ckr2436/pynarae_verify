@@ -5,25 +5,38 @@ $formKey = $block->getFormKey();
 <div class="admin__page-section">
     <div class="admin__page-section-title"><span class="title">Batch Generate Anti-Counterfeit QR Package</span></div>
     <div class="admin__page-section-content">
-        <form method="post" action="<?= $block->escapeUrl($block->getSubmitUrl()) ?>" class="admin__fieldset">
+        <form method="post"
+              action="<?= $block->escapeUrl($block->getSubmitUrl()) ?>"
+              class="admin__fieldset"
+              data-mage-init='{"validation":{}}'
+              id="pynarae-verify-generate-form">
             <input type="hidden" name="form_key" value="<?= $block->escapeHtmlAttr($formKey) ?>" />
 
             <fieldset class="admin__fieldset">
                 <legend class="admin__legend"><span>Product & Batch Parameters</span></legend>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="product_name"><span>Product Name</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="product_name" id="product_name" required /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="product_name">
+                        <span>Product Name</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry" type="text" name="product_name" id="product_name" required /></div>
                 </div>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="product_sku"><span>Product SKU</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="product_sku" id="product_sku" /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="product_sku">
+                        <span>Product SKU</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry" type="text" name="product_sku" id="product_sku" required /></div>
                 </div>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="batch_no"><span>Batch Number</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="batch_no" id="batch_no" required /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="batch_no">
+                        <span>Batch Number</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry" type="text" name="batch_no" id="batch_no" required /></div>
                 </div>
 
                 <div class="admin__field field">
@@ -40,19 +53,28 @@ $formKey = $block->getFormKey();
             <fieldset class="admin__fieldset">
                 <legend class="admin__legend"><span>Generation Parameters</span></legend>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="count"><span>QR Code Quantity</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="1" max="50000" name="count" id="count" value="<?= (int)$block->getDefaultCount() ?>" required /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="count">
+                        <span>QR Code Quantity</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry validate-digits validate-greater-than-zero" type="number" min="1" max="50000" name="count" id="count" value="<?= (int)$block->getDefaultCount() ?>" required /></div>
                 </div>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="prefix"><span>Code Prefix</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="text" name="prefix" id="prefix" value="<?= $block->escapeHtmlAttr($block->getDefaultPrefix()) ?>" required /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="prefix">
+                        <span>Code Prefix</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry" type="text" name="prefix" id="prefix" value="<?= $block->escapeHtmlAttr($block->getDefaultPrefix()) ?>" required /></div>
                 </div>
 
-                <div class="admin__field field">
-                    <label class="admin__field-label" for="length"><span>Random Body Length</span></label>
-                    <div class="admin__field-control"><input class="admin__control-text" type="number" min="6" max="48" name="length" id="length" value="<?= (int)$block->getDefaultCodeLength() ?>" required /></div>
+                <div class="admin__field field required">
+                    <label class="admin__field-label" for="length">
+                        <span>Random Body Length</span>
+                        <span style="color:#e02b27;">*</span>
+                    </label>
+                    <div class="admin__field-control"><input class="admin__control-text required-entry validate-digits validate-greater-than-zero" type="number" min="6" max="48" name="length" id="length" value="<?= (int)$block->getDefaultCodeLength() ?>" required /></div>
                 </div>
 
                 <div class="admin__field field">

@@ -61,18 +61,31 @@ class Form extends Generic
             'values' => $this->statusSource->toOptionArray(),
         ]);
 
+        $fieldset->addField('product_name', 'text', [
+            'name' => 'product_name',
+            'label' => __('Product Name'),
+            'title' => __('Product Name'),
+            'required' => true,
+            'class' => 'required-entry',
+            'after_element_html' => '<span class="required">*</span>',
+        ]);
+
         $fieldset->addField('product_sku', 'text', [
             'name' => 'product_sku',
             'label' => __('Product SKU'),
             'title' => __('Product SKU'),
-            'required' => false,
+            'required' => true,
+            'class' => 'required-entry',
+            'after_element_html' => '<span class="required">*</span>',
         ]);
 
         $fieldset->addField('batch_no', 'text', [
             'name' => 'batch_no',
             'label' => __('Batch Number'),
             'title' => __('Batch Number'),
-            'required' => false,
+            'required' => true,
+            'class' => 'required-entry',
+            'after_element_html' => '<span class="required">*</span>',
         ]);
 
         $fieldset->addField('notes', 'textarea', [

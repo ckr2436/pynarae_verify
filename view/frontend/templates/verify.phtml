@@ -34,11 +34,7 @@ $introText = trim($block->getIntroText());
                     <table class="data table">
                         <tbody>
                         <tr>
-                            <th><?= $block->escapeHtml(__('Verification Code')) ?></th>
-                            <td><?= $block->escapeHtml($submittedCode) ?></td>
-                        </tr>
-                        <tr>
-                            <th><?= $block->escapeHtml(__('Status')) ?></th>
+                            <th><?= $block->escapeHtml(__('Verification Status')) ?></th>
                             <td><?= $block->escapeHtml(__('Awaiting secondary verification')) ?></td>
                         </tr>
                         </tbody>

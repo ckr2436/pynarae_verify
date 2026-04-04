@@ -34,6 +34,37 @@ class Run extends Action
         $params = (array)$request->getPostValue();
 
         try {
+            $productName = trim((string)($params['product_name'] ?? ''));
+            $productSku = trim((string)($params['product_sku'] ?? ''));
+            $batchNo = trim((string)($params['batch_no'] ?? ''));
+            $prefix = trim((string)($params['prefix'] ?? ''));
+            $count = (int)($params['count'] ?? 0);
+            $length = (int)($params['length'] ?? 0);
+
+            if ($productName === '') {
+                throw new LocalizedException(__('Product Name is required.'));
+            }
+
+            if ($productSku === '') {
+                throw new LocalizedException(__('Product SKU is required.'));
+            }
+
+            if ($batchNo === '') {
+                throw new LocalizedException(__('Batch Number is required.'));
+            }
+
+            if ($prefix === '') {
+                throw new LocalizedException(__('Code Prefix is required.'));
+            }
+
+            if ($count <= 0) {
+                throw new LocalizedException(__('QR Code Quantity must be greater than 0.'));
+            }
+
+            if ($length < 6) {
+                throw new LocalizedException(__('Random Body Length must be at least 6.'));
+            }
+
             $result = $this->batchPackageService->generate($params);
             $csvDownloadUrl = $this->getUrl('pynarae_verify/generate/download', ['path' => base64_encode((string)$result['csv_relative_path'])]);
             $zipDownloadUrl = $this->getUrl('pynarae_verify/generate/download', ['path' => base64_encode((string)$result['zip_relative_path'])]);
